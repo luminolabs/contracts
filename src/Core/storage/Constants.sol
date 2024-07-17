@@ -9,6 +9,13 @@ contract Constants {
         Buffer
     }
 
+    enum Status {
+        Create,
+        Execution,
+        ProofCreation,
+        Completed
+    }
+
     //  total number of states
     uint8 public constant NUM_STATES = 3;
     //  length of epoch in seconds

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-contract Structs {
+library Structs {
     struct Staker {
         bool isSlashed;
         address _address;
@@ -18,5 +18,23 @@ contract Structs {
     struct Lock {
         uint256 amount;
         uint256 unlockAfter;
+    }
+
+    struct Commitment {
+        uint32 epoch;
+        bytes32 commitmentHash;
+    }
+
+    struct Job {
+        uint256 jobId;
+        address creator;
+        address assignee;
+        string jobDetailsInJSON;
+    }
+
+    //tbd
+    struct AssignedJob {
+        uint16 leadId;
+        string jobDetailsInJSON;
     }
 }
