@@ -23,6 +23,7 @@ library Structs {
     struct Commitment {
         uint32 epoch;
         bytes32 commitmentHash;
+        bool revealed;
     }
 
     struct Job {
@@ -34,7 +35,7 @@ library Structs {
 
     //tbd
     struct AssignedJob {
-        uint16 leadId;
-        string jobDetailsInJSON;
+        uint16 jobId;
+        bytes32 resultHash;
     }
 }
