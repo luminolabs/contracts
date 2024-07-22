@@ -66,6 +66,9 @@ contract StakeManager is StakeManagerStorage, StateManager {
         require(stakers[_stakerId].stake > 0, "Non-positive stake");
         require(locks[msg.sender].amount == 0, "Existing Unstake Lock");
 
+        require(stakers[_stakerId]._address == msg.sender, "can only unstake your funds");
+        require(stakers[_stakerId].stake <= _amount, "Amount exceeds current stake");
+
         uint32 epoch = getEpoch();
 
         locks[msg.sender] = Structs.Lock(_amount, epoch + unstakeLockPeriod);
@@ -85,7 +88,9 @@ contract StakeManager is StakeManagerStorage, StateManager {
         require(lock.unlockAfter != 0, "Did not Unstake");
         require(lock.unlockAfter <= epoch, "Withdraw epoch not reached");
 
-        // uint256 withdrawAmount = lock.amount;
+        uint256 withdrawAmount = lock.amount;
+
+        stakers[_stakerId].stake = stakers[_stakerId].stake - withdrawAmount;
 
         _resetLock(_stakerId);
 
