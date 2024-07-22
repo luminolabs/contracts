@@ -26,13 +26,12 @@ abstract contract StakeManagerStorage is Structs {
     }
 
     // minimum amount of stake required to become a staker
-    uint256 public minStake = 20000 * (10**18);
+    uint256 public minStake = 20000 * (10 ** 18);
 
     // minimum amount of stake required to become a staker
-    uint256 public minSafeLumToken = 10000 * (10**18);
+    uint256 public minSafeLumToken = 10000 * (10 ** 18);
 
     uint8 public buffer = 5;
     // the number of epochs for which the stake is locked for calling unstake()
     uint16 public unstakeLockPeriod = 1;
-
 }

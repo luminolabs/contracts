@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import "./storage/Constants.sol";
 
 contract StateManager is Constants {
-    
     /**
      * @notice a check to ensure the epoch value sent in the function is of the currect epoch
      */
