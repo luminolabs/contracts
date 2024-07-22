@@ -38,4 +38,12 @@ library Structs {
         uint16 jobId;
         bytes32 resultHash;
     }
+
+    struct MerkleTree {
+        // better name for this
+        Structs.AssignedJob[] values;
+        bytes32[][] proofs;
+        bytes32 root;
+    }
+
 }
