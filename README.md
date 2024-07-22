@@ -11,6 +11,10 @@ The Lumino Staking System is designed to manage staker participation, token stak
 - Unstaking process with lock periods
 - Role-based access control
 
+### High-Level Architecture Diagram
+
+![Lumino Staking System](assets/mermaid-diagram-2024-07-22-120532.png)
+
 ### Main Components
 
 1. **ACL (Access Control List)**: Manages role-based access control.
