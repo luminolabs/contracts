@@ -46,4 +46,12 @@ library Structs {
         bytes32 root;
     }
 
+    struct Block {
+        bool valid;
+        uint32 proposerId;
+        // some fields TBD
+        uint256[] jobIds;
+        uint256 iteration;
+        uint256 biggestStake;
+    }
 }
