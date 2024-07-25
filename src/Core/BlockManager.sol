@@ -118,4 +118,15 @@ contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
         return 50 * 1e18; // Example: 50 tokens per job
     }
 
+function getConfirmedBlock(uint32 epoch) external view returns (Structs.Block memory) {
+        return blocks[epoch];
+    }
+
+    function getProposedBlock(uint32 epoch, uint32 blockId) external view returns (Structs.Block memory) {
+        return proposedBlocks[epoch][blockId];
+    }
+
+    function getNumProposedBlocks(uint32 epoch) external view returns (uint256) {
+        return sortedProposedBlockIds[epoch].length;
+    }
 }
