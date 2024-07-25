@@ -63,6 +63,10 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
         return jobs[_jobId];
     }
 
+    function getJobStatus(uint256 _jobId) external view returns (Status) {
+        return jobStatus[_jobId];
+    }
+
     function getJobsForStaker(bytes32 _seed, uint32 _stakerId) external view returns (uint256[] memory) {
         require(activeJobIds.length >= jobsPerStaker, "Not enough active jobs");
         

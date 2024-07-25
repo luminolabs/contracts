@@ -7,15 +7,19 @@ import "./storage/BlockStorage.sol";
 import "./StateManager.sol";
 import "./interface/IStakeManager.sol";
 import "./interface/IJobsManager.sol";
-// import "./interface/IVoteManager.sol";
+import "./interface/IVoteManager.sol";
 import "../lib/Structs.sol";
 
 contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
     IStakeManager public stakeManager;
     IJobsManager public jobsManager;
-    // IVoteManager public voteManager;
+    IVoteManager public voteManager;
 
-    event BlockProposed(uint32 indexed epoch, uint32 indexed blockId, address proposer);
+    event BlockProposed(
+        uint32 indexed epoch,
+        uint32 indexed blockId,
+        address proposer
+    );
     event BlockConfirmed(uint32 indexed epoch, uint32 indexed blockId);
 
     function initialize(
@@ -26,22 +30,39 @@ contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
     ) external initializer {
         stakeManager = IStakeManager(_stakeManager);
         jobsManager = IJobsManager(_jobsManager);
-        // voteManager = IVoteManager(_voteManager);
+        voteManager = IVoteManager(_voteManager);
         blockIndexToBeConfirmed = -1;
     }
 
-    function propose(uint32 epoch, uint256[] memory _jobIds) external checkEpochAndState(State.Propose, epoch, buffer) {
-        require(numProposedBlocks < MAX_BLOCKS_PER_EPOCH_PER_STAKER, "Max blocks for epoch reached");
-        
+    // refine the logic while functional testing
+    // for now it is flawed
+    function propose(
+        uint32 epoch,
+        uint256[] memory _jobIds
+    ) external checkEpochAndState(State.Propose, epoch, buffer) {
+        require(
+            numProposedBlocks < MAX_BLOCKS_PER_EPOCH_PER_STAKER,
+            "Max blocks for epoch reached"
+        );
+
         uint32 stakerId = stakeManager.getStakerId(msg.sender);
         require(stakerId != 0, "Not a registered staker");
-        require(stakeManager.getStake(stakerId) >= minStake, "Insufficient stake to propose");
-        require(epochLastProposed[stakerId] < epoch, "Already proposed in this epoch");
+        require(
+            stakeManager.getStake(stakerId) >= minStake,
+            "Insufficient stake to propose"
+        );
+        require(
+            epochLastProposed[stakerId] < epoch,
+            "Already proposed in this epoch"
+        );
 
         uint256 biggestStake = 0;
         for (uint256 i = 0; i < _jobIds.length; i++) {
-            require(jobsManager.getJobDetails(_jobIds[i]).status == Structs.Status.Execution, "Invalid job status");
-            uint256 jobStake = voteManager.getStakeForJob(epoch, _jobIds[i]);
+            require(
+                jobsManager.getJobStatus(i) == Constants.Status.Execution,
+                "Invalid job status"
+            );
+            uint256 jobStake = stakeManager.getStake(stakerId);
             if (jobStake > biggestStake) {
                 biggestStake = jobStake;
             }
@@ -64,12 +85,22 @@ contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
         emit BlockProposed(epoch, blockId, msg.sender);
     }
 
-    function confirmBlock(uint32 epoch) external checkEpochAndState(State.Commit, epoch + 1, buffer) {
-        require(sortedProposedBlockIds[epoch].length > 0, "No blocks proposed in the previous epoch");
-        require(blockIndexToBeConfirmed == -1, "Block already confirmed for this epoch");
+    function confirmBlock(
+        uint32 epoch
+    ) external checkEpochAndState(State.Commit, epoch + 1, buffer) {
+        require(
+            sortedProposedBlockIds[epoch].length > 0,
+            "No blocks proposed in the previous epoch"
+        );
+        require(
+            blockIndexToBeConfirmed == -1,
+            "Block already confirmed for this epoch"
+        );
 
         uint32 blockIdToConfirm = sortedProposedBlockIds[epoch][0];
-        Structs.Block storage blockToConfirm = proposedBlocks[epoch][blockIdToConfirm];
+        Structs.Block storage blockToConfirm = proposedBlocks[epoch][
+            blockIdToConfirm
+        ];
 
         require(blockToConfirm.valid, "Invalid block");
 
@@ -84,31 +115,17 @@ contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
         emit BlockConfirmed(epoch, blockIdToConfirm);
     }
 
+    // to be implmented while functional testing
     function _processRewards(uint32 epoch, uint32 blockId) internal {
         Structs.Block storage confirmedBlock = proposedBlocks[epoch][blockId];
-        
+
         // Reward the block proposer
-        stakeManager.rewardStaker(confirmedBlock.proposerId, calculateProposerReward());
-
-        // Reward stakers who participated in the jobs
-        for (uint256 i = 0; i < confirmedBlock.jobIds.length; i++) {
-            uint256 jobId = confirmedBlock.jobIds[i];
-            address[] memory participants = voteManager.getJobParticipants(epoch, jobId);
-            uint256 jobReward = calculateJobReward(jobId);
-            uint256 rewardPerParticipant = jobReward / participants.length;
-            
-            for (uint256 j = 0; j < participants.length; j++) {
-                uint32 participantId = stakeManager.getStakerId(participants[j]);
-                stakeManager.rewardStaker(participantId, rewardPerParticipant);
-            }
-        }
-
+        // stakeManager.rewardStaker(confirmedBlock.proposerId, calculateProposerReward());
         // Reset numProposedBlocks for the next epoch
         numProposedBlocks = 0;
     }
 
     function calculateProposerReward() internal pure returns (uint256) {
-        
         return 100 * 1e18;
     }
 
@@ -118,15 +135,22 @@ contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
         return 50 * 1e18; // Example: 50 tokens per job
     }
 
-function getConfirmedBlock(uint32 epoch) external view returns (Structs.Block memory) {
+    function getConfirmedBlock(
+        uint32 epoch
+    ) external view returns (Structs.Block memory) {
         return blocks[epoch];
     }
 
-    function getProposedBlock(uint32 epoch, uint32 blockId) external view returns (Structs.Block memory) {
+    function getProposedBlock(
+        uint32 epoch,
+        uint32 blockId
+    ) external view returns (Structs.Block memory) {
         return proposedBlocks[epoch][blockId];
     }
 
-    function getNumProposedBlocks(uint32 epoch) external view returns (uint256) {
+    function getNumProposedBlocks(
+        uint32 epoch
+    ) external view returns (uint256) {
         return sortedProposedBlockIds[epoch].length;
     }
 }
