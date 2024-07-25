@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-contract Structs {
+library Structs {
     struct Staker {
         bool isSlashed;
         address _address;
@@ -18,5 +18,40 @@ contract Structs {
     struct Lock {
         uint256 amount;
         uint256 unlockAfter;
+    }
+
+    struct Commitment {
+        uint32 epoch;
+        bytes32 commitmentHash;
+        bool revealed;
+    }
+
+    struct Job {
+        uint256 jobId;
+        address creator;
+        address assignee;
+        string jobDetailsInJSON;
+    }
+
+    //tbd
+    struct AssignedJob {
+        uint16 jobId;
+        bytes32 resultHash;
+    }
+
+    struct MerkleTree {
+        // better name for this
+        Structs.AssignedJob[] values;
+        bytes32[][] proofs;
+        bytes32 root;
+    }
+
+    struct Block {
+        bool valid;
+        uint32 proposerId;
+        // some fields TBD
+        uint256[] jobIds;
+        uint256 iteration;
+        uint256 biggestStake;
     }
 }
