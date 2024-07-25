@@ -2,11 +2,15 @@
 pragma solidity ^0.8.20;
 
 import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import "../../lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+import "../../lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import "./ACL.sol";
 import "./storage/VoteManagerStorage.sol";
 import "./StateManager.sol";
 import "./StakeManager.sol";
+import "./JobsManager.sol";
 import "./interface/IStakeManager.sol";
+import "./interface/IJobsManager.sol";
 import "../Initializable.sol";
 
 /** @title VoteManager
@@ -18,12 +22,15 @@ contract VoteManager is Initializable, VoteManagerStorage, StateManager, ACL {
     // IStakeManager public stakeManager;
     // IERC20 public lumino;
     IStakeManager public stakeManager;
+    IJobsManager public jobsManager;
 
     function initialize(
         address stakeManagerAddress,
+        address jobsManagerAddress,
         address blockManagerAddress
-    ) external initializer hasRole(DEFAULT_ADMIN_ROLE, msg.sender) {
+    ) external initializer onlyRole(DEFAULT_ADMIN_ROLE) {
         stakeManager = IStakeManager(stakeManagerAddress);
+        jobsManager = IJobsManager(jobsManagerAddress);
         // blockManager = IBlockManager(blockManagerAddress);
     }
 
@@ -65,25 +72,98 @@ contract VoteManager is Initializable, VoteManagerStorage, StateManager, ACL {
         }
     }
 
-    /**
-     * @notice staker reveal the jobs that they had committed to the protocol in the commit state.
-     * Stakers would only reveal the jobs they have been allocated
-     * @dev stakers would need to submit their commitments/votes in accordance of how they were assigned to the staker.
-     * for example, if they are assigned the following job ids: [2,5,4], they would to send their reveal votes in the same order only
-     * // The votes of other ids dont matter but they should not be passed in the values.
-     * So staker would have to pass the proof path of the assigned values of the merkle tree, root of the merkle tree and
-     * the values being revealed into a struct in the Structs.MerkleTree format.
-     * @param epoch epoch when the revealed their votes
-     * @param tree the merkle tree struct of the staker
-     * @param signature staker's signature on the messageHash which calculates
-     * the secret using which seed would be calculated and thereby checking for collection allocation
-     */
     function reveal(
         uint32 epoch,
-        Structs.MerkleTree memory tree,
+        Structs.JobVerifier[] memory results,
         bytes memory signature
     ) external initialized checkEpochAndState(State.Reveal, epoch, buffer) {
         uint32 stakerId = stakeManager.getStakerId(msg.sender);
-        
+        require(stakerId > 0, "Staker does not exist");
+        require(
+            commitments[stakerId].epoch == epoch,
+            "Not committed in this epoch"
+        );
+        require(!commitments[stakerId].revealed, "Already revealed");
+        // number of Jobs tobeAssigned or assigned
+        // require(results.length == toAssign, "Incorrect number of job results");
+
+        bytes32 seed = _verifySeedAndCommitment(
+            stakerId,
+            epoch,
+            results,
+            signature
+        );
+
+        _processResults(stakerId, epoch, results, seed);
+
+        commitments[stakerId].revealed = true;
+        epochLastRevealed[stakerId] = epoch;
+
+    }
+
+    function _verifySeedAndCommitment(
+        uint32 stakerId,
+        uint32 epoch,
+        Structs.JobVerifier[] memory results,
+        bytes memory signature
+    ) internal view returns (bytes32) {
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(msg.sender, epoch, block.chainid, "luminoprotocol")
+        );
+        require(
+            ECDSA.recover(
+                MessageHashUtils.toEthSignedMessageHash(messageHash),
+                signature
+            ) == msg.sender,
+            "Invalid signature"
+        );
+
+        bytes32 secret = keccak256(signature);
+        bytes32 seed = keccak256(abi.encode(salt, secret));
+        bytes32 resultsHash = keccak256(abi.encode(results, seed));
+        require(
+            resultsHash == commitments[stakerId].commitmentHash,
+            "Incorrect results or seed"
+        );
+
+        return seed;
+    }
+
+    function _processResults(
+        uint32 stakerId,
+        uint32 epoch,
+        Structs.JobVerifier[] memory results,
+        bytes32 seed
+    ) internal {
+        uint256[] memory activeJobs = jobsManager.getActiveJobs();
+        for (uint16 i = 0; i < results.length; i++) {
+            require(
+                _isJobAllotedToStaker(
+                    seed,
+                    i,
+                    activeJobs.length,
+                    results[i].jobId
+                ),
+                "Revealed job not allotted"
+            );
+            require(
+                results[i].resultHash != bytes32(0),
+                "Empty result for assigned job"
+            );
+            assignedJob[epoch][stakerId].push(
+                Structs.AssignedJob(results[i].jobId, results[i].resultHash)
+            );
+        }
+    }
+
+    function _isJobAllotedToStaker(
+        bytes32 seed,
+        uint16 index,
+        uint256 totalJobs,
+        uint256 jobId
+    ) internal pure returns (bool) {
+        return
+            uint256(keccak256(abi.encodePacked(seed, index))) % totalJobs ==
+            jobId;
     }
 }
