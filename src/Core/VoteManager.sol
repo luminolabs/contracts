@@ -166,4 +166,8 @@ contract VoteManager is Initializable, VoteManagerStorage, StateManager, ACL {
             uint256(keccak256(abi.encodePacked(seed, index))) % totalJobs ==
             jobId;
     }
+
+
+    // for possible future upgrades
+    uint256[50] private __gap;
 }
