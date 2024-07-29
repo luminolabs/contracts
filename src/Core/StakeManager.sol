@@ -21,6 +21,7 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
         // Initialize contract state here
         // For example:
         // lumino = IERC20(_luminoAddress);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         voteManager = IVoteManager(_voteManagerAddress);
     }
 

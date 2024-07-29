@@ -14,6 +14,7 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
     event JobStatusUpdated(uint256 indexed jobId, Status newStatus);
 
     function initialize(uint8 _jobsPerStaker) external initializer onlyRole(DEFAULT_ADMIN_ROLE) {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         jobIdCounter = 1;
         jobsPerStaker = _jobsPerStaker;
     }

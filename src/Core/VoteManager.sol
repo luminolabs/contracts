@@ -29,6 +29,7 @@ contract VoteManager is Initializable, VoteManagerStorage, StateManager, ACL {
         address jobsManagerAddress
         // address blockManagerAddress
     ) external initializer onlyRole(DEFAULT_ADMIN_ROLE) {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         stakeManager = IStakeManager(stakeManagerAddress);
         jobsManager = IJobsManager(jobsManagerAddress);
         // blockManager = IBlockManager(blockManagerAddress);

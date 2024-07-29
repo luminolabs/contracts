@@ -28,6 +28,7 @@ contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
         address _voteManager,
         uint256 _minStakeToPropose
     ) external initializer {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         stakeManager = IStakeManager(_stakeManager);
         jobsManager = IJobsManager(_jobsManager);
         voteManager = IVoteManager(_voteManager);
