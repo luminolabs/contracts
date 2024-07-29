@@ -4,15 +4,25 @@ pragma solidity ^0.8.20;
 import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "./storage/StakeManagerStorage.sol";
 import "./StateManager.sol";
+import "./interface/IVoteManager.sol";
+import "../Initializable.sol";
+import "./ACL.sol";
 
 /** @title StakeManager
  * @notice StakeManager handles stake, unstake, withdraw, reward, functions
  * for stakers
  */
 
-contract StakeManager is StakeManagerStorage, StateManager {
-    // IVoteManager public voteManager;
+contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
+    IVoteManager public voteManager;
     // IERC20 public lumino;
+
+    function initialize(address _voteManagerAddress) public initializer {
+        // Initialize contract state here
+        // For example:
+        // lumino = IERC20(_luminoAddress);
+        voteManager = IVoteManager(_voteManagerAddress);
+    }
 
     /**
      *  @dev A staker can call stake() in any state
@@ -110,4 +120,7 @@ contract StakeManager is StakeManagerStorage, StateManager {
             unlockAfter: 0
         });
     }
+
+    // for possible future upgrades
+    uint256[50] private __gap;
 }
