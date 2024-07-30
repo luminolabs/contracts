@@ -30,8 +30,8 @@ contract DeployUpgradeableLuminoProtocol is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         deployContracts(deployer);
-        initializeContracts(deployer);
-        setupRoles(deployer);
+        initializeACL(deployer);
+        initializeOtherContracts(deployer);
 
         vm.stopBroadcast();
 
@@ -75,15 +75,8 @@ contract DeployUpgradeableLuminoProtocol is Script {
         );
     }
 
-    function initializeContracts(address deployer) internal {
+    function initializeACL(address deployer) internal {
         ACL(address(aclProxy)).initialize();
-        StakeManager(address(stakeManagerProxy)).initialize();
-        JobsManager(address(jobsManagerProxy)).initialize(5);
-        VoteManager(address(voteManagerProxy)).initialize(address(stakeManagerProxy), address(jobsManagerProxy));
-        BlockManager(address(blockManagerProxy)).initialize(address(stakeManagerProxy), address(jobsManagerProxy), address(voteManagerProxy), 1000 ether);
-    }
-
-    function setupRoles(address deployer) internal {
         bytes32 adminRole = ACL(address(aclProxy)).DEFAULT_ADMIN_ROLE();
         ACL(address(aclProxy)).grantRole(adminRole, deployer);
         ACL(address(aclProxy)).grantRole(adminRole, address(stakeManagerProxy));
@@ -92,12 +85,44 @@ contract DeployUpgradeableLuminoProtocol is Script {
         ACL(address(aclProxy)).grantRole(adminRole, address(blockManagerProxy));
     }
 
+   function initializeOtherContracts(address deployer) internal {
+        require(address(stakeManagerProxy) != address(0), "StakeManager Proxy address is zero");
+        require(address(jobsManagerProxy) != address(0), "JobsManager Proxy address is zero");
+        require(address(voteManagerProxy) != address(0), "VoteManager Proxy address is zero");
+        require(address(blockManagerProxy) != address(0), "BlockManager Proxy address is zero");
+
+        StakeManager(address(stakeManagerProxy)).initialize(address(voteManagerProxy));
+        JobsManager(address(jobsManagerProxy)).initialize(5);
+        VoteManager(address(voteManagerProxy)).initialize(
+            address(stakeManagerProxy),
+            address(jobsManagerProxy)
+        );
+        BlockManager(address(blockManagerProxy)).initialize(
+            address(stakeManagerProxy),
+            address(jobsManagerProxy),
+            address(voteManagerProxy),
+            1000 ether
+        );
+    }
+
     function logAddresses() internal view {
         console.log("ProxyAdmin deployed at:", address(proxyAdmin));
         console.log("ACL Proxy deployed at:", address(aclProxy));
-        console.log("StakeManager Proxy deployed at:", address(stakeManagerProxy));
-        console.log("JobsManager Proxy deployed at:", address(jobsManagerProxy));
-        console.log("VoteManager Proxy deployed at:", address(voteManagerProxy));
-        console.log("BlockManager Proxy deployed at:", address(blockManagerProxy));
+        console.log(
+            "StakeManager Proxy deployed at:",
+            address(stakeManagerProxy)
+        );
+        console.log(
+            "JobsManager Proxy deployed at:",
+            address(jobsManagerProxy)
+        );
+        console.log(
+            "VoteManager Proxy deployed at:",
+            address(voteManagerProxy)
+        );
+        console.log(
+            "BlockManager Proxy deployed at:",
+            address(blockManagerProxy)
+        );
     }
 }

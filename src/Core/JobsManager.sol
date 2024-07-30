@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import "./ACL.sol";
 import "./StateManager.sol";
-import "../Initializable.sol";
 import "../lib/Structs.sol";
 import "../Core/storage/JobStorage.sol";
 

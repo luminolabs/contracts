@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "./ACL.sol";
-import "../Initializable.sol";
+// import "../Initializable.sol";
 import "./storage/BlockStorage.sol";
 import "./StateManager.sol";
 import "./interface/IStakeManager.sol";
