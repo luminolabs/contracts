@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../../lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import "../../lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
+import "../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import "./storage/VoteManagerStorage.sol";
 import "./StateManager.sol";
 import "./StakeManager.sol";
@@ -28,7 +29,6 @@ contract VoteManager is Initializable, VoteManagerStorage, StateManager, ACL {
         address jobsManagerAddress
         // address blockManagerAddress
     ) external initializer onlyRole(DEFAULT_ADMIN_ROLE) {
-        __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         stakeManager = IStakeManager(stakeManagerAddress);
         jobsManager = IJobsManager(jobsManagerAddress);

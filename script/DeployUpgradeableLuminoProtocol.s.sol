@@ -76,7 +76,7 @@ contract DeployUpgradeableLuminoProtocol is Script {
     }
 
     function initializeACL(address deployer) internal {
-        ACL(address(aclProxy)).initialize();
+        ACL(address(aclProxy));
         bytes32 adminRole = ACL(address(aclProxy)).DEFAULT_ADMIN_ROLE();
         ACL(address(aclProxy)).grantRole(adminRole, deployer);
         ACL(address(aclProxy)).grantRole(adminRole, address(stakeManagerProxy));

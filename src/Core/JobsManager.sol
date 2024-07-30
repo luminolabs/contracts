@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import "../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import "./ACL.sol";
 import "./StateManager.sol";
 import "../lib/Structs.sol";
