@@ -1,27 +1,66 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
+
 import "../../lib/Structs.sol";
 
+/**
+ * @title BlockStorage
+ * @notice This contract manages the storage of block-related data for the Lumino network
+ * @dev This contract is intended to be inherited by the BlockManager contract
+ */
 contract BlockStorage {
-    
-    /// mapping of epoch -> blockId -> block
+    /**
+     * @notice Stores proposed blocks for each epoch
+     * @dev Mapping of epoch -> blockId -> block
+     */
     mapping(uint32 => mapping(uint32 => Structs.Block)) public proposedBlocks;
-    
-    /// mapping of  epoch -> blocks
+
+    /**
+     * @notice Stores confirmed blocks for each epoch
+     * @dev Mapping of epoch -> block
+     */
     mapping(uint32 => Structs.Block) public blocks;
 
-    /// mapping of epoch->blockId
+    /**
+     * @notice Stores sorted block IDs for each epoch
+     * @dev Mapping of epoch -> array of blockIds
+     */
     mapping(uint32 => uint32[]) public sortedProposedBlockIds;
-    
-    /// mapping of stakerId->epoch
-    mapping(uint32 => uint32) public epochLastProposed;
-    
-    /// total number of proposed blocks in an epoch
-    uint32 public numProposedBlocks;
-        
-    /// block index that is to be confirmed if not disputed
-    int8 public blockIndexToBeConfirmed; // Index in sortedProposedBlockIds
 
+    /**
+     * @notice Tracks the last epoch in which each staker proposed a block
+     * @dev Mapping of stakerId -> epoch
+     */
+    mapping(uint32 => uint32) public epochLastProposed;
+
+    /**
+     * @notice Total number of proposed blocks in the current epoch
+     */
+    uint32 public numProposedBlocks;
+
+    /**
+     * @notice Index of the block that is to be confirmed if not disputed
+     * @dev Index in sortedProposedBlockIds array, -1 if no block to confirm
+     */
+    int8 public blockIndexToBeConfirmed;
+
+    /**
+     * @notice Maximum number of blocks a staker can propose per epoch
+     */
     uint256 public constant MAX_BLOCKS_PER_EPOCH_PER_STAKER = 1;
 
+    /**
+     * @notice Emitted when a new block is proposed
+     * @param epoch The epoch in which the block was proposed
+     * @param blockId The ID of the proposed block
+     * @param proposer The address of the staker who proposed the block
+     */
+    event BlockProposed(uint32 indexed epoch, uint32 indexed blockId, address proposer);
+
+    /**
+     * @notice Emitted when a block is confirmed
+     * @param epoch The epoch in which the block was confirmed
+     * @param blockId The ID of the confirmed block
+     */
+    event BlockConfirmed(uint32 indexed epoch, uint32 indexed blockId);
 }
