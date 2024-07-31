@@ -25,17 +25,23 @@ library Structs {
         bytes32 commitmentHash;
         bool revealed;
     }
-
+    
     struct Job {
         uint256 jobId;
         address creator;
         address assignee;
+        uint32 creationEpoch;
+        uint32 executionEpoch;
+        uint32 completionEpoch;
         string jobDetailsInJSON;
     }
-
+    struct JobVerifier {
+        uint256 jobId;
+        bytes32 resultHash;
+    }
     //tbd
     struct AssignedJob {
-        uint16 jobId;
+        uint256 jobId;
         bytes32 resultHash;
     }
 

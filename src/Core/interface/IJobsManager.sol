@@ -21,6 +21,8 @@ interface IJobsManager {
     
     function getJobDetails(uint256 _jobId) external view returns (Structs.Job memory);
     
+    function getJobStatus(uint256 _jobId) external view returns (Constants.Status);
+    
     function getJobsForStaker(bytes32 _seed, uint32 _stakerId) external view returns (uint256[] memory);
     
     // Additional view functions
