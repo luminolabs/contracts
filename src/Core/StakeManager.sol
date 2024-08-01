@@ -17,7 +17,7 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
     IVoteManager public voteManager;
     // IERC20 public lumino;
 
-    function initialize(address _voteManagerAddress) public initializer {
+    function initialize(address _voteManagerAddress) public initializer override {
         // Initialize contract state here
         // For example:
         // lumino = IERC20(_luminoAddress);

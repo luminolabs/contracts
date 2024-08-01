@@ -10,35 +10,51 @@ import "../src/Core/JobsManager.sol";
 import "../src/Core/VoteManager.sol";
 import "../src/Core/BlockManager.sol";
 
+/// @title DeployUpgradeableLuminoProtocol
+/// @notice This contract is responsible for deploying and initializing the Lumino Protocol's core contracts
+/// @dev This script uses the TransparentUpgradeableProxy pattern for upgradeable contracts
 contract DeployUpgradeableLuminoProtocol is Script {
+    /// @notice The private key of the deployer account
+    uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+    
+    /// @notice The address of the deployer account
+    address deployer = vm.addr(deployerPrivateKey);
+    
+    /// @notice The ProxyAdmin contract instance
     ProxyAdmin public proxyAdmin;
+    
+    /// @notice The implementation contract instances
     ACL public aclImpl;
     StakeManager public stakeManagerImpl;
     JobsManager public jobsManagerImpl;
     VoteManager public voteManagerImpl;
     BlockManager public blockManagerImpl;
 
+    /// @notice The proxy contract instances
     TransparentUpgradeableProxy public aclProxy;
     TransparentUpgradeableProxy public stakeManagerProxy;
     TransparentUpgradeableProxy public jobsManagerProxy;
     TransparentUpgradeableProxy public voteManagerProxy;
     TransparentUpgradeableProxy public blockManagerProxy;
 
+    /// @notice The main function to run the deployment script
+    /// @dev This function deploys all contracts, initializes them, and logs their addresses
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
+        console.log("Deployer Address : ", deployer);
         vm.startBroadcast(deployerPrivateKey);
 
-        deployContracts(deployer);
-        initializeACL(deployer);
-        initializeOtherContracts(deployer);
+        deployContracts();
+        initializeACL();
+        // initializeOtherContracts();
 
         vm.stopBroadcast();
 
         logAddresses();
     }
 
-    function deployContracts(address deployer) internal {
+    /// @notice Deploys all the contracts and their proxies
+    /// @dev This function deploys the implementation contracts and their corresponding proxies
+    function deployContracts() internal {
         proxyAdmin = new ProxyAdmin(deployer);
 
         aclImpl = new ACL();
@@ -75,17 +91,21 @@ contract DeployUpgradeableLuminoProtocol is Script {
         );
     }
 
-    function initializeACL(address deployer) internal {
-        ACL(address(aclProxy));
-        bytes32 adminRole = ACL(address(aclProxy)).DEFAULT_ADMIN_ROLE();
-        ACL(address(aclProxy)).grantRole(adminRole, deployer);
-        ACL(address(aclProxy)).grantRole(adminRole, address(stakeManagerProxy));
-        ACL(address(aclProxy)).grantRole(adminRole, address(jobsManagerProxy));
-        ACL(address(aclProxy)).grantRole(adminRole, address(voteManagerProxy));
-        ACL(address(aclProxy)).grantRole(adminRole, address(blockManagerProxy));
+    /// @notice Initializes the ACL contract
+    /// @dev This function sets up the initial roles for the ACL contract
+    function initializeACL() internal {
+        ACL acl = ACL(address(aclProxy));
+        acl.initialize(deployer);  // Initialize the ACL contract
+        bytes32 adminRole = acl.DEFAULT_ADMIN_ROLE();
+        acl.grantRole(adminRole, address(stakeManagerProxy));
+        acl.grantRole(adminRole, address(jobsManagerProxy));
+        acl.grantRole(adminRole, address(voteManagerProxy));
+        acl.grantRole(adminRole, address(blockManagerProxy));
     }
 
-   function initializeOtherContracts(address deployer) internal {
+    /// @notice Initializes other core contracts
+    /// @dev This function initializes StakeManager, JobsManager, VoteManager, and BlockManager
+    function initializeOtherContracts() internal {
         require(address(stakeManagerProxy) != address(0), "StakeManager Proxy address is zero");
         require(address(jobsManagerProxy) != address(0), "JobsManager Proxy address is zero");
         require(address(voteManagerProxy) != address(0), "VoteManager Proxy address is zero");
@@ -101,10 +121,12 @@ contract DeployUpgradeableLuminoProtocol is Script {
             address(stakeManagerProxy),
             address(jobsManagerProxy),
             address(voteManagerProxy),
-            1000 ether
+            10 ether
         );
     }
 
+    /// @notice Logs the addresses of all deployed contracts
+    /// @dev This function prints the addresses of all proxies and the ProxyAdmin
     function logAddresses() internal view {
         console.log("ProxyAdmin deployed at:", address(proxyAdmin));
         console.log("ACL Proxy deployed at:", address(aclProxy));
