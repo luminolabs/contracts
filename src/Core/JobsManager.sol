@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import "../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import "./ACL.sol";
 import "./StateManager.sol";
-import "../Initializable.sol";
 import "../lib/Structs.sol";
 import "../Core/storage/JobStorage.sol";
 
@@ -14,8 +14,19 @@ import "../Core/storage/JobStorage.sol";
  */
 contract JobsManager is Initializable, StateManager, ACL, JobStorage {
 
-    // Events for logging important actions
+     /**
+     * @notice Emitted when a new job is created
+     * @param jobId The ID of the newly created job
+     * @param creator The address of the account that created the job
+     * @param epoch The epoch in which the job was created
+     */
     event JobCreated(uint256 indexed jobId, address indexed creator, uint32 epoch);
+
+    /**
+     * @notice Emitted when a job's status is updated
+     * @param jobId The ID of the job whose status was updated
+     * @param newStatus The new status of the job
+     */
     event JobStatusUpdated(uint256 indexed jobId, Status newStatus);
 
     /**
@@ -24,6 +35,7 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
      */
     function initialize(uint8 _jobsPerStaker) external initializer onlyRole(DEFAULT_ADMIN_ROLE) {
         // Initialize the job ID counter
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         jobIdCounter = 1;
 
         // Set the number of jobs to be assigned per staker

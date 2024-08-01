@@ -2,18 +2,29 @@
 pragma solidity ^0.8.20;
 
 import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import "../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import "./storage/StakeManagerStorage.sol";
 import "./StateManager.sol";
+import "./interface/IVoteManager.sol";
+import "./ACL.sol";
 
 /**
  * @title StakeManager
  * @dev Manages staking, unstaking, withdrawing, and rewarding functions for stakers in the Lumino network.
  * This contract handles the core staking mechanics of the system.
  */
-contract StakeManager is StakeManagerStorage, StateManager {
+
+contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
+    IVoteManager public voteManager;
     // TODO: Uncomment and implement these interfaces when ready
-    // IVoteManager public voteManager;
     // IERC20 public lumino;
+
+    function initialize(address _voteManagerAddress) public initializer override {
+        // Initialize contract state here
+        // lumino = IERC20(_luminoAddress);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        voteManager = IVoteManager(_voteManagerAddress);
+    }
 
     /**
      * @dev Allows a user to stake $LUMINO tokens in the network.
@@ -121,4 +132,7 @@ contract StakeManager is StakeManagerStorage, StateManager {
     }
 
     // TODO: Implement additional functions such as slashing, reward distribution, etc.
+    
+    // for possible future upgrades
+    uint256[50] private __gap;
 }

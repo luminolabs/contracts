@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import "../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import "./ACL.sol";
-import "../Initializable.sol";
+// import "../Initializable.sol";
 import "./storage/BlockStorage.sol";
 import "./StateManager.sol";
 import "./interface/IStakeManager.sol";
@@ -21,8 +22,19 @@ contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
     IJobsManager public jobsManager;
     IVoteManager public voteManager;
 
-    // Events for logging important actions
+    /**
+     * @notice Emitted when a new block is proposed
+     * @param epoch The epoch in which the block was proposed
+     * @param blockId The ID of the proposed block
+     * @param proposer The address of the staker who proposed the block
+     */
     event BlockProposed(uint32 indexed epoch, uint32 indexed blockId, address proposer);
+
+    /**
+     * @notice Emitted when a block is confirmed
+     * @param epoch The epoch in which the block was confirmed
+     * @param blockId The ID of the confirmed block
+     */
     event BlockConfirmed(uint32 indexed epoch, uint32 indexed blockId);
 
     /**
@@ -39,6 +51,7 @@ contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
         uint256 _minStakeToPropose
     ) external initializer {
         // Set up connections to other contracts
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         stakeManager = IStakeManager(_stakeManager);
         jobsManager = IJobsManager(_jobsManager);
         voteManager = IVoteManager(_voteManager);

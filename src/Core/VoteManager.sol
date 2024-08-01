@@ -4,14 +4,14 @@ pragma solidity ^0.8.20;
 import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../../lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import "../../lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
-import "./ACL.sol";
+import "../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import "./storage/VoteManagerStorage.sol";
 import "./StateManager.sol";
 import "./StakeManager.sol";
 import "./JobsManager.sol";
 import "./interface/IStakeManager.sol";
 import "./interface/IJobsManager.sol";
-import "../Initializable.sol";
+import "./ACL.sol";
 
 /**
  * @title VoteManager
@@ -31,6 +31,7 @@ contract VoteManager is Initializable, VoteManagerStorage, StateManager, ACL {
         address stakeManagerAddress,
         address jobsManagerAddress
     ) external initializer onlyRole(DEFAULT_ADMIN_ROLE) {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         stakeManager = IStakeManager(stakeManagerAddress);
         jobsManager = IJobsManager(jobsManagerAddress);
     }
@@ -68,7 +69,7 @@ contract VoteManager is Initializable, VoteManagerStorage, StateManager, ACL {
         uint32 epoch,
         Structs.JobVerifier[] memory results,
         bytes memory signature
-    ) external initialized checkEpochAndState(State.Reveal, epoch, buffer) {
+    ) external checkEpochAndState(State.Reveal, epoch, buffer) {
         uint32 stakerId = stakeManager.getStakerId(msg.sender);
         require(stakerId > 0, "Staker does not exist");
         require(commitments[stakerId].epoch == epoch, "Not committed in this epoch");
@@ -145,7 +146,7 @@ contract VoteManager is Initializable, VoteManagerStorage, StateManager, ACL {
             );
             require(results[i].resultHash != bytes32(0), "Empty result for assigned job");
 
-            assignedJob[epoch][stakerId].push(
+            assignedJobs[epoch][stakerId].push(
                 Structs.AssignedJob(results[i].jobId, results[i].resultHash)
             );
         }
@@ -167,4 +168,7 @@ contract VoteManager is Initializable, VoteManagerStorage, StateManager, ACL {
     ) internal pure returns (bool) {
         return uint256(keccak256(abi.encodePacked(seed, index))) % totalJobs == jobId;
     }
+
+    // for possible future upgrades
+    uint256[50] private __gap;
 }

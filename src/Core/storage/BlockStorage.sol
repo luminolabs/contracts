@@ -48,19 +48,5 @@ contract BlockStorage {
      * @notice Maximum number of blocks a staker can propose per epoch
      */
     uint256 public constant MAX_BLOCKS_PER_EPOCH_PER_STAKER = 1;
-
-    /**
-     * @notice Emitted when a new block is proposed
-     * @param epoch The epoch in which the block was proposed
-     * @param blockId The ID of the proposed block
-     * @param proposer The address of the staker who proposed the block
-     */
-    event BlockProposed(uint32 indexed epoch, uint32 indexed blockId, address proposer);
-
-    /**
-     * @notice Emitted when a block is confirmed
-     * @param epoch The epoch in which the block was confirmed
-     * @param blockId The ID of the confirmed block
-     */
-    event BlockConfirmed(uint32 indexed epoch, uint32 indexed blockId);
+    
 }

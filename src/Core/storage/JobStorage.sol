@@ -40,19 +40,5 @@ abstract contract JobStorage is Constants {
      * @dev This value can be adjusted to balance workload and network capacity
      */
     uint8 public jobsPerStaker;
-
-    /**
-     * @notice Emitted when a new job is created
-     * @param jobId The ID of the newly created job
-     * @param creator The address of the account that created the job
-     * @param epoch The epoch in which the job was created
-     */
-    event JobCreated(uint256 indexed jobId, address indexed creator, uint32 epoch);
-
-    /**
-     * @notice Emitted when a job's status is updated
-     * @param jobId The ID of the job whose status was updated
-     * @param newStatus The new status of the job
-     */
-    event JobStatusUpdated(uint256 indexed jobId, Status newStatus);
+   
 }
