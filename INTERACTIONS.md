@@ -170,25 +170,15 @@ These events facilitate off-chain tracking and system monitoring.
 
 ## Visual Representation
 
-Here's a diagram showing the main contract interactions:
+Here are diagrams showing the main contract interactions:
 
-```mermaid
-graph TD
-    A[ACL] --> B[StakeManager]
-    A --> C[JobsManager]
-    A --> D[VoteManager]
-    A --> E[BlockManager]
-    B <--> C
-    B <--> D
-    B <--> E
-    C <--> D
-    C <--> E
-    D <--> E
-    F[StateManager] --> B
-    F --> C
-    F --> D
-    F --> E
-```
+![State Transition Flow](/assets/stateTransition.png)
+
+![staking Diagram](/assets/stakingSquenceDiagram.png)
+
+![Commit Reveal Flow](/assets/CommitRevealFlow.png)
+
+![BlockManagerFlow](/assets/BlockManagerFlow.png)
 
 ## Security Considerations
 
