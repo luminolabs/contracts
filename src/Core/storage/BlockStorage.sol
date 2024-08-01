@@ -16,13 +16,12 @@ contract BlockStorage {
     /// mapping of stakerId->epoch
     mapping(uint32 => uint32) public epochLastProposed;
     
-    uint256 public constant MAX_BLOCKS_PER_EPOCH_PER_STAKER = 1;
-        
     /// total number of proposed blocks in an epoch
     uint32 public numProposedBlocks;
-
+        
     /// block index that is to be confirmed if not disputed
     int8 public blockIndexToBeConfirmed; // Index in sortedProposedBlockIds
 
+    uint256 public constant MAX_BLOCKS_PER_EPOCH_PER_STAKER = 1;
 
 }
