@@ -13,14 +13,17 @@ import "../Core/storage/JobStorage.sol";
  * This contract handles job-related operations and maintains job states.
  */
 contract JobsManager is Initializable, StateManager, ACL, JobStorage {
-
-     /**
+    /**
      * @notice Emitted when a new job is created
      * @param jobId The ID of the newly created job
      * @param creator The address of the account that created the job
      * @param epoch The epoch in which the job was created
      */
-    event JobCreated(uint256 indexed jobId, address indexed creator, uint32 epoch);
+    event JobCreated(
+        uint256 indexed jobId,
+        address indexed creator,
+        uint32 epoch
+    );
 
     /**
      * @notice Emitted when a job's status is updated
@@ -33,7 +36,9 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
      * @dev Initializes the JobsManager contract.
      * @param _jobsPerStaker The number of jobs to be assigned per staker
      */
-    function initialize(uint8 _jobsPerStaker) external initializer onlyRole(DEFAULT_ADMIN_ROLE) {
+    function initialize(
+        uint8 _jobsPerStaker
+    ) external initializer onlyRole(DEFAULT_ADMIN_ROLE) {
         // Initialize the job ID counter
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         jobIdCounter = 1;
@@ -46,7 +51,9 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
      * @dev Creates a new job in the system.
      * @param _jobDetailsInJSON A JSON string containing the job details
      */
-    function createJob(string memory _jobDetailsInJSON) external {
+    function createJob(
+        string memory _jobDetailsInJSON
+    ) external payable returns (uint256) {
         // Get the current epoch
         uint32 currentEpoch = getEpoch();
 
@@ -72,6 +79,8 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
 
         // Emit an event to log the job creation
         emit JobCreated(newJobId, msg.sender, currentEpoch);
+
+        return newJobId;
     }
 
     /**
@@ -117,7 +126,9 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
      * @param _jobId The ID of the job to retrieve
      * @return The Job struct containing the job details
      */
-    function getJobDetails(uint256 _jobId) external view returns (Structs.Job memory) {
+    function getJobDetails(
+        uint256 _jobId
+    ) external view returns (Structs.Job memory) {
         require(jobs[_jobId].jobId != 0, "Job does not exist");
         return jobs[_jobId];
     }
@@ -137,7 +148,10 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
      * @param _stakerId The ID of the staker to assign jobs to
      * @return An array of job IDs assigned to the staker
      */
-    function getJobsForStaker(bytes32 _seed, uint32 _stakerId) external view returns (uint256[] memory) {
+    function getJobsForStaker(
+        bytes32 _seed,
+        uint32 _stakerId
+    ) external view returns (uint256[] memory) {
         // Ensure there are enough active jobs to assign
         require(activeJobIds.length >= jobsPerStaker, "Not enough active jobs");
 
@@ -147,7 +161,9 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
         // Assign jobs to the staker
         for (uint8 i = 0; i < jobsPerStaker; i++) {
             // Use the seed, staker ID, and index to generate a pseudo-random index
-            uint256 index = uint256(keccak256(abi.encodePacked(_seed, _stakerId, i))) % activeJobIds.length;
+            uint256 index = uint256(
+                keccak256(abi.encodePacked(_seed, _stakerId, i))
+            ) % activeJobIds.length;
             // Assign the job at the calculated index
             assignedJobs[i] = activeJobIds[index];
         }

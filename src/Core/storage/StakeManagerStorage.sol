@@ -56,24 +56,5 @@ abstract contract StakeManagerStorage {
      */
     SlashNums public slashNums;
 
-    /**
-     * @notice Emitted when a new staker joins the network
-     * @param stakerId The ID assigned to the new staker
-     * @param stakerAddress The address of the new staker
-     */
-    event NewStaker(uint32 indexed stakerId, address indexed stakerAddress);
-
-    /**
-     * @notice Emitted when a staker's stake is updated
-     * @param stakerId The ID of the staker
-     * @param newStake The new stake amount
-     */
-    event StakeUpdated(uint32 indexed stakerId, uint256 newStake);
-
-    /**
-     * @notice Emitted when a staker is slashed
-     * @param stakerId The ID of the slashed staker
-     * @param slashedAmount The amount of stake slashed
-     */
-    event StakerSlashed(uint32 indexed stakerId, uint256 slashedAmount);
+   
 }

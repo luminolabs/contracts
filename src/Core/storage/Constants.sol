@@ -48,7 +48,7 @@ contract Constants {
      * @notice Minimum safe amount of LUMINO tokens for a staker
      * @dev 10,000 LUMINO tokens (assuming 18 decimal places)
      */
-    uint256 public minSafeLumToken = 10_000 * (10 ** 18);
+    uint256 public minSafeLumToken = 10 * (10 ** 18);
 
     /**
      * @notice Buffer time in seconds for state transitions

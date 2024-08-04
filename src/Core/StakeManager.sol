@@ -16,6 +16,7 @@ import "./ACL.sol";
 
 contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
     IVoteManager public voteManager;
+
     // TODO: Uncomment and implement these interfaces when ready
     // IERC20 public lumino;
 
@@ -27,6 +28,27 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
     }
 
     /**
+     * @notice Emitted when a new staker joins the network
+     * @param stakerId The ID assigned to the new staker
+     * @param stakerAddress The address of the new staker
+     */
+    event NewStaker(uint32 indexed stakerId, address indexed stakerAddress);
+
+    /**
+     * @notice Emitted when a staker's stake is updated
+     * @param stakerId The ID of the staker
+     * @param newStake The new stake amount
+     */
+    event StakeUpdated(uint32 indexed stakerId, uint256 newStake);
+
+    /**
+     * @notice Emitted when a staker is slashed
+     * @param stakerId The ID of the slashed staker
+     * @param slashedAmount The amount of stake slashed
+     */
+    event StakerSlashed(uint32 indexed stakerId, uint256 slashedAmount);
+
+    /**
      * @dev Allows a user to stake $LUMINO tokens in the network.
      * @param _epoch The epoch for which the staker is requesting to stake
      * @param _amount The amount of $LUMINO tokens to stake
@@ -36,12 +58,19 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
         uint32 _epoch,
         uint256 _amount,
         string memory _machineSpecInJSON
-    ) external checkEpoch(_epoch) {
+    ) external payable checkEpoch(_epoch) {
         uint32 stakerId = stakerIds[msg.sender];
 
         if (stakerId == 0) {
             // First-time staker
-            require(_amount >= minSafeLumToken, "Less than minimum safe LUMINO token amount");
+            require(
+                msg.value == _amount,
+                "token amount and tokens sent does not match"
+            );
+            require(
+                msg.value >= minSafeLumToken,
+                "Less than minimum safe LUMINO token amount"
+            );
 
             // Increment the total number of stakers
             numStakers = numStakers + 1;
@@ -84,13 +113,22 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
         require(stakers[_stakerId].stake > 0, "No stake to unstake");
         require(locks[msg.sender].amount == 0, "Existing unstake lock");
 
-        require(stakers[_stakerId]._address == msg.sender, "Can only unstake your own funds");
-        require(stakers[_stakerId].stake >= _amount, "Unstake amount exceeds current stake");
+        require(
+            stakers[_stakerId]._address == msg.sender,
+            "Can only unstake your own funds"
+        );
+        require(
+            stakers[_stakerId].stake >= _amount,
+            "Unstake amount exceeds current stake"
+        );
 
         uint32 currentEpoch = getEpoch();
 
         // Create a new lock for the unstaked amount
-        locks[msg.sender] = Structs.Lock(_amount, currentEpoch + unstakeLockPeriod);
+        locks[msg.sender] = Structs.Lock(
+            _amount,
+            currentEpoch + unstakeLockPeriod
+        );
 
         // TODO: Consider reducing the staker's stake here or in the withdraw function
     }
@@ -132,7 +170,7 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
     }
 
     // TODO: Implement additional functions such as slashing, reward distribution, etc.
-    
+
     // for possible future upgrades
     uint256[50] private __gap;
 }
