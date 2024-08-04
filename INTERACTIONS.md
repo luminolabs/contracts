@@ -109,6 +109,8 @@ The Lumino Staking System consists of several interconnected contracts, each res
   - `EPOCH_LENGTH`: Duration of each epoch in seconds
   - `NUM_STATES`: Number of states in each epoch
 
+  ![State Transition Flow](/assets/stateTransition.png)
+
 ## Interaction Flow Examples
 
 1. **Staking Process**:
@@ -117,6 +119,8 @@ The Lumino Staking System consists of several interconnected contracts, each res
    - JobsManager assigns jobs using `getJobsForStaker(seed, stakerId)`
    - VoteManager enables voting for the staker
 
+   ![staking Diagram](/assets/stakingSquenceDiagram.png)
+
 2. **Job Execution and Voting**:
    - User calls `JobsManager.createJob(jobDetails)`
    - JobsManager calls `StakeManager.getStake(stakerId)` to check eligibility
@@ -124,11 +128,15 @@ The Lumino Staking System consists of several interconnected contracts, each res
    - Staker calls `VoteManager.reveal(epoch, results, signature)` to reveal votes
    - BlockManager includes job results in the proposed block
 
+   ![Commit Reveal Flow](/assets/CommitRevealFlow.png)
+
 3. **Block Creation and Confirmation**:
    - Staker calls `BlockManager.propose(epoch, jobIds)`
    - BlockManager calls `StakeManager.getStake(proposerId)` to verify proposer
    - VoteManager provides voting results to BlockManager
    - BlockManager calls `confirmBlock(epoch)` to finalize the block
+
+   ![BlockManagerFlow](/assets/BlockManagerFlow.png)
 
 ## State Transitions
 
@@ -167,18 +175,6 @@ Important events emitted during interactions include:
 - `BlockConfirmed(uint32 indexed epoch, uint32 indexed blockId)`
 
 These events facilitate off-chain tracking and system monitoring.
-
-## Visual Representation
-
-Here are diagrams showing the main contract interactions:
-
-![State Transition Flow](/assets/stateTransition.png)
-
-![staking Diagram](/assets/stakingSquenceDiagram.png)
-
-![Commit Reveal Flow](/assets/CommitRevealFlow.png)
-
-![BlockManagerFlow](/assets/BlockManagerFlow.png)
 
 ## Security Considerations
 
