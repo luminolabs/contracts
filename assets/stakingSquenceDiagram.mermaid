@@ -1,0 +1,17 @@
+
+sequenceDiagram
+    participant User
+    participant StakeManager
+    participant JobsManager
+    participant VoteManager
+
+    User->>StakeManager: stake(epoch, amount, machineSpec)
+    StakeManager->>StakeManager: Update stakers mapping
+    StakeManager->>JobsManager: Notify new staker
+    JobsManager->>StakeManager: New staker ack 
+    JobsManager->>JobsManager: Assign jobs to staker
+    StakeManager->>StakeManager: checks for minStake for participation
+    StakeManager->>JobsManager: enables staking eligibility 
+    JobsManager->>VoteManager: enables voting
+    StakeManager->>User: Confirm staking
+
