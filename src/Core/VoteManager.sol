@@ -4,46 +4,40 @@ pragma solidity ^0.8.20;
 import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../../lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import "../../lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
-import "./ACL.sol";
+import "../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import "./storage/VoteManagerStorage.sol";
 import "./StateManager.sol";
 import "./StakeManager.sol";
 import "./JobsManager.sol";
 import "./interface/IStakeManager.sol";
 import "./interface/IJobsManager.sol";
-import "../Initializable.sol";
+import "./ACL.sol";
 
-/** @title VoteManager
- * @notice VoteManager handles commit, reveal, voting,
- * snapshots and salt for the network
+/**
+ * @title VoteManager
+ * @dev Manages the voting process, including commit and reveal phases, for the Lumino Staking System.
+ * This contract handles the core voting mechanics and result verification.
  */
-
 contract VoteManager is Initializable, VoteManagerStorage, StateManager, ACL {
-    // IStakeManager public stakeManager;
-    // IERC20 public lumino;
     IStakeManager public stakeManager;
     IJobsManager public jobsManager;
 
+    /**
+     * @dev Initializes the VoteManager contract.
+     * @param stakeManagerAddress Address of the StakeManager contract
+     * @param jobsManagerAddress Address of the JobsManager contract
+     */
     function initialize(
         address stakeManagerAddress,
         address jobsManagerAddress
-        // address blockManagerAddress
     ) external initializer onlyRole(DEFAULT_ADMIN_ROLE) {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         stakeManager = IStakeManager(stakeManagerAddress);
         jobsManager = IJobsManager(jobsManagerAddress);
-        // blockManager = IBlockManager(blockManagerAddress);
     }
 
     /**
-     * @notice Allows stakers to commit to a job by submitting a hash of their results instead of revealing them immediately.
-     * @dev The commitment process involves the following steps:
-     * // The staker constructs a Merkle tree of their results.
-     * Commitment is created by hashing the Merkle root with a seed (hash of salt and staker's secret).
-     * Job allocation is determined using the seed, allowing stakers to know their assignments at commit time.
-     * Stakers should only perform assigned jobs, setting results for unassigned jobs to 0.
-     * Before registering the commitment, the staker confirms the previous epoch's block if needed.
-     * Block rewards and penalties are applied based on previous epoch activity and votes.
-     *
+     * @dev Allows stakers to commit their votes for an epoch.
      * @param epoch The epoch for which the commitment is being made
      * @param commitment The hashed commitment (Merkle root + seed)
      */
@@ -51,65 +45,64 @@ contract VoteManager is Initializable, VoteManagerStorage, StateManager, ACL {
         uint32 epoch,
         bytes32 commitment
     ) external checkEpochAndState(State.Commit, epoch, buffer) {
-        require(commitment != 0x0, "Invalid commitment");
+        require(commitment != bytes32(0), "Invalid commitment");
+
         uint32 stakerId = stakeManager.getStakerId(msg.sender);
-        require(
-            !stakeManager.getStaker(stakerId).isSlashed,
-            "staker is slashed"
-        );
         require(stakerId > 0, "Staker does not exist");
-        require(commitments[stakerId].epoch != epoch, "already commited");
-        // Switch to call confirm block only when block in previous epoch has not been confirmed
-        // and if previous epoch do have proposed blocks
-        // if (!blockManager.isBlockConfirmed(epoch - 1)) {
-        //     blockManager.confirmPreviousEpochBlock(stakerId);
-        // }
-        // stakeManager.givePenalties(epoch, stakerId);
-        uint256 thisStakerStake = stakeManager.getStake(stakerId);
-        if (thisStakerStake >= minStake) {
+        require(!stakeManager.getStaker(stakerId).isSlashed, "Staker is slashed");
+        require(commitments[stakerId].epoch != epoch, "Already committed for this epoch");
+
+        uint256 stakerStake = stakeManager.getStake(stakerId);
+        if (stakerStake >= minStake) {
             commitments[stakerId].epoch = epoch;
             commitments[stakerId].commitmentHash = commitment;
         }
     }
 
+    /**
+     * @dev Allows stakers to reveal their votes for an epoch.
+     * @param epoch The epoch for which the reveal is being made
+     * @param results Array of JobVerifier structs containing job results
+     * @param signature The staker's signature for verification
+     */
     function reveal(
         uint32 epoch,
         Structs.JobVerifier[] memory results,
         bytes memory signature
-    ) external initialized checkEpochAndState(State.Reveal, epoch, buffer) {
+    ) external checkEpochAndState(State.Reveal, epoch, buffer) {
         uint32 stakerId = stakeManager.getStakerId(msg.sender);
         require(stakerId > 0, "Staker does not exist");
-        require(
-            commitments[stakerId].epoch == epoch,
-            "Not committed in this epoch"
-        );
+        require(commitments[stakerId].epoch == epoch, "Not committed in this epoch");
         require(!commitments[stakerId].revealed, "Already revealed");
-        // number of Jobs tobeAssigned or assigned
-        // require(results.length == toAssign, "Incorrect number of job results");
 
-        bytes32 seed = _verifySeedAndCommitment(
-            stakerId,
-            epoch,
-            results,
-            signature
-        );
+        bytes32 seed = _verifySeedAndCommitment(stakerId, epoch, results, signature);
 
         _processResults(stakerId, epoch, results, seed);
 
         commitments[stakerId].revealed = true;
         epochLastRevealed[stakerId] = epoch;
-
     }
 
+    /**
+     * @dev Verifies the staker's seed and commitment.
+     * @param stakerId The ID of the staker
+     * @param epoch The current epoch
+     * @param results Array of JobVerifier structs containing job results
+     * @param signature The staker's signature
+     * @return The verified seed
+     */
     function _verifySeedAndCommitment(
         uint32 stakerId,
         uint32 epoch,
         Structs.JobVerifier[] memory results,
         bytes memory signature
     ) internal view returns (bytes32) {
+        // Create a message hash for signature verification
         bytes32 messageHash = keccak256(
             abi.encodePacked(msg.sender, epoch, block.chainid, "luminoprotocol")
         );
+
+        // Verify the signature
         require(
             ECDSA.recover(
                 MessageHashUtils.toEthSignedMessageHash(messageHash),
@@ -118,8 +111,11 @@ contract VoteManager is Initializable, VoteManagerStorage, StateManager, ACL {
             "Invalid signature"
         );
 
+        // Generate the seed from the signature
         bytes32 secret = keccak256(signature);
         bytes32 seed = keccak256(abi.encode(salt, secret));
+
+        // Verify the commitment
         bytes32 resultsHash = keccak256(abi.encode(results, seed));
         require(
             resultsHash == commitments[stakerId].commitmentHash,
@@ -129,6 +125,13 @@ contract VoteManager is Initializable, VoteManagerStorage, StateManager, ACL {
         return seed;
     }
 
+    /**
+     * @dev Processes the revealed results for a staker.
+     * @param stakerId The ID of the staker
+     * @param epoch The current epoch
+     * @param results Array of JobVerifier structs containing job results
+     * @param seed The verified seed
+     */
     function _processResults(
         uint32 stakerId,
         uint32 epoch,
@@ -138,32 +141,34 @@ contract VoteManager is Initializable, VoteManagerStorage, StateManager, ACL {
         uint256[] memory activeJobs = jobsManager.getActiveJobs();
         for (uint16 i = 0; i < results.length; i++) {
             require(
-                _isJobAllotedToStaker(
-                    seed,
-                    i,
-                    activeJobs.length,
-                    results[i].jobId
-                ),
+                _isJobAllotedToStaker(seed, i, activeJobs.length, results[i].jobId),
                 "Revealed job not allotted"
             );
-            require(
-                results[i].resultHash != bytes32(0),
-                "Empty result for assigned job"
-            );
-            assignedJob[epoch][stakerId].push(
+            require(results[i].resultHash != bytes32(0), "Empty result for assigned job");
+
+            assignedJobs[epoch][stakerId].push(
                 Structs.AssignedJob(results[i].jobId, results[i].resultHash)
             );
         }
     }
 
+    /**
+     * @dev Checks if a job was allotted to a staker based on the seed.
+     * @param seed The verified seed
+     * @param index The index of the job in the results array
+     * @param totalJobs The total number of active jobs
+     * @param jobId The ID of the job to check
+     * @return Boolean indicating if the job was allotted to the staker
+     */
     function _isJobAllotedToStaker(
         bytes32 seed,
         uint16 index,
         uint256 totalJobs,
         uint256 jobId
     ) internal pure returns (bool) {
-        return
-            uint256(keccak256(abi.encodePacked(seed, index))) % totalJobs ==
-            jobId;
+        return uint256(keccak256(abi.encodePacked(seed, index))) % totalJobs == jobId;
     }
+
+    // for possible future upgrades
+    uint256[50] private __gap;
 }
