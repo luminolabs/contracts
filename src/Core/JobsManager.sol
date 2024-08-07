@@ -72,7 +72,7 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
         });
 
         // Set the initial status of the job
-        jobStatus[newJobId] = Status.Create;
+        jobStatus[newJobId] = Status.Created;
 
         // Add the new job to the list of active jobs
         activeJobIds.push(newJobId);
