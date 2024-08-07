@@ -11,20 +11,21 @@ contract Constants {
      * @notice Represents the different states of an epoch
      */
     enum State {
-        Commit,  // Stakers commit their votes
-        Reveal,  // Stakers reveal their votes
-        Propose, // Block proposers submit block proposals
-        Buffer   // Transition period between epochs
+        Assign, // JobsManager assign jobs to stakers
+        Accept, // Stakers accept the jobs
+        Confirm, // A Proposer is selected and a block is prooposed
+        Buffer // Buffer Transition period between epochs
     }
 
     /**
      * @notice Represents the different statuses of a job
      */
     enum Status {
-        Create,        // Job is created but not yet started
-        Execution,     // Job is currently being executed
-        ProofCreation, // Proof of job completion is being created
-        Completed      // Job is fully completed and verified
+        Cancelled, // Job is cancelled
+        Created, // Job is created but not yet started
+        Execution, // Job is currently being executed
+        ProofGeneration, // Proof of job completion is being created
+        Completed // Job is fully completed and verified
     }
 
     /**
@@ -40,15 +41,15 @@ contract Constants {
 
     /**
      * @notice Minimum amount of stake required to become a staker
-     * @dev 20,000 LUMINO tokens (assuming 18 decimal places)
+     * @dev 10 LUMINO native tokens (assuming 18 decimal places)
      */
-    uint256 public minStake = 20_000 * (10 ** 18);
+    uint256 public minStake = 10 * (10 ** 18);
 
     /**
      * @notice Minimum safe amount of LUMINO tokens for a staker
-     * @dev 10,000 LUMINO tokens (assuming 18 decimal places)
+     * @dev 1 LUMINO token (assuming 18 decimal places)
      */
-    uint256 public minSafeLumToken = 10 * (10 ** 18);
+    uint256 public minSafeLumToken = 1 * (10 ** 18);
 
     /**
      * @notice Buffer time in seconds for state transitions
