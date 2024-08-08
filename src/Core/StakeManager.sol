@@ -151,6 +151,10 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
         // Reset the lock
         _resetLock(_stakerId);
 
+        // Transfer the amount to the sender
+        (bool success, ) = msg.sender.call{value: withdrawAmount}("");
+        require(success, "Transfer failed");
+        
         // TODO: Transfer LUMINO tokens back to the staker
         // require(lumino.transfer(msg.sender, withdrawAmount), "Token transfer failed");
     }
@@ -199,6 +203,15 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
      */
     function getStake(uint32 stakerId) external view returns (uint256) {
         return stakers[stakerId].stake;
+    }
+    
+    /**
+     * @dev Retrieves the locked amount for a given staker.
+     * @param _stakerAddress The unique identifier of the staker
+     * @return locks for the staker
+     */
+    function getLocks(address _stakerAddress) external view returns (Structs.Lock memory) {
+        return locks[_stakerAddress];
     }
 
     // TODO: Implement additional functions such as slashing, reward distribution, etc.

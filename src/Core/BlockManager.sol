@@ -55,7 +55,7 @@ contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
         blockIndexToBeConfirmed = -1;
 
         // TODO: Set minStake here if it's a storage variable
-        // minStake = _minStakeToPropose;
+        minStake = _minStakeToPropose;
     }
 
     /**
@@ -68,6 +68,7 @@ contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
     checkEpochAndState(State.Confirm, epoch, buffer)
     {
         // Check if the maximum number of blocks for this epoch has been reached
+        // Eventually to be increased for stakers who are running backup nodes
         require(numProposedBlocks < MAX_BLOCKS_PER_EPOCH_PER_STAKER, "Max blocks for epoch reached");
 
         // Get the staker's ID and perform eligibility checks

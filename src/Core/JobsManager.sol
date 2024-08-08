@@ -51,9 +51,7 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
      * @dev Creates a new job in the system.
      * @param _jobDetailsInJSON A JSON string containing the job details
      */
-    function createJob(
-        string memory _jobDetailsInJSON
-    ) external payable returns (uint256) {
+    function createJob(string memory _jobDetailsInJSON) external payable returns (uint256) {
         // Get the current epoch
         uint32 currentEpoch = getEpoch();
 
@@ -67,6 +65,7 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
             assignee: address(0), // No assignee yet
             creationEpoch: currentEpoch,
             executionEpoch: 0, // Will be set when job starts execution
+            proofGenerationEpoch: 0, // Will be set when staker starts proof generation
             completionEpoch: 0, // Will be set when job is completed
             jobDetailsInJSON: _jobDetailsInJSON
         });
@@ -91,6 +90,8 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
     function updateJobStatus(uint256 _jobId, Status _newStatus) external {
         // Ensure the job exists
         require(jobs[_jobId].jobId != 0, "Job does not exist");
+        // Ensure only Assignee can update the status
+        require(jobs[_jobId].assignee == msg.sender, "Only assignee can update the jobStatus");
 
         // Ensure the new status is a valid progression from the current status
         require(_newStatus > jobStatus[_jobId], "Invalid status transition");
@@ -102,6 +103,9 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
         if (_newStatus == Status.Execution) {
             // Record the execution start epoch
             jobs[_jobId].executionEpoch = getEpoch();
+        } else if (_newStatus == Status.Completed) {
+            // Record the execution start epoch
+            jobs[_jobId].proofGenerationEpoch = getEpoch();
         } else if (_newStatus == Status.Completed) {
             // Record the completion epoch
             jobs[_jobId].completionEpoch = getEpoch();
