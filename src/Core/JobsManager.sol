@@ -38,7 +38,7 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
      */
     function initialize(
         uint8 _jobsPerStaker
-    ) external initializer onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external initializer {
         // Initialize the job ID counter
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         jobIdCounter = 1;
@@ -91,10 +91,10 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
         // Ensure the job exists
         require(jobs[_jobId].jobId != 0, "Job does not exist");
         // Ensure only Assignee can update the status
-        require(jobs[_jobId].assignee == msg.sender, "Only assignee can update the jobStatus");
+        require(jobs[_jobId].assignee == msg.sender || hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only assignee can update the jobStatus");
 
         // Ensure the new status is a valid progression from the current status
-        require(_newStatus > jobStatus[_jobId], "Invalid status transition");
+        require(uint(_newStatus) == uint(jobStatus[_jobId]) + 1, "Invalid status transition");
 
         // Update the job status
         jobStatus[_jobId] = _newStatus;
