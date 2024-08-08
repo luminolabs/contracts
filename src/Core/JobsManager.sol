@@ -116,6 +116,8 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
         // Emit an event to log the status update
         emit JobStatusUpdated(_jobId, _newStatus);
     }
+    
+    // TODO: Manual AssignJob function
 
     /**
      * @dev Retrieves the list of active job IDs.
@@ -146,6 +148,9 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
         return jobStatus[_jobId];
     }
 
+    // TODO: visibility to be moved to internal, the seed should fetch from the 
+    // the voteManager/blockManager contracts at the end of each epoch
+    // the seed will be set by the blockProposer of the epoch
     /**
      * @dev Assigns jobs to a staker based on a seed value.
      * @param _seed A random seed used for job assignment
@@ -155,12 +160,18 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
     function getJobsForStaker(
         bytes32 _seed,
         uint32 _stakerId
-    ) external view returns (uint256[] memory) {
+    ) external returns (uint256[] memory) {
         // Ensure there are enough active jobs to assign
         require(activeJobIds.length >= jobsPerStaker, "Not enough active jobs");
 
         // Create an array to store the assigned job IDs
         uint256[] memory assignedJobs = new uint256[](jobsPerStaker);
+
+        for (uint256 i = 0; i < activeJobIds.length; i++) {
+            if (jobStatus[activeJobIds[i]] == Constants.Status.Assigned) {
+                delete activeJobIds[i];
+            }
+        }
 
         // Assign jobs to the staker
         for (uint8 i = 0; i < jobsPerStaker; i++) {
