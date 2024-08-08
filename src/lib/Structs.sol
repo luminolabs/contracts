@@ -12,15 +12,15 @@ library Structs {
      * @dev Used to store comprehensive information about each staker
      */
     struct Staker {
-        bool isSlashed;             // Whether the staker has been slashed
-        address _address;           // Ethereum address of the staker
-        uint32 id;                  // Unique identifier for the staker
-        uint32 age;                 // Number of epochs the staker has been active
-        uint32 epochFirstStaked;    // Epoch when the staker first staked
-        uint32 epochLastPenalized;  // Last epoch when the staker was penalized
-        uint256 stake;              // Current stake amount
-        uint256 stakerReward;       // Accumulated rewards
-        string machineSpecInJSON;   // JSON string containing machine specifications
+        bool isSlashed; // Whether the staker has been slashed
+        address _address; // Ethereum address of the staker
+        uint32 id; // Unique identifier for the staker
+        uint32 age; // Number of epochs the staker has been active
+        uint32 epochFirstStaked; // Epoch when the staker first staked
+        uint32 epochLastPenalized; // Last epoch when the staker was penalized
+        uint256 stake; // Current stake amount
+        uint256 stakerReward; // Accumulated rewards
+        string machineSpecInJSON; // JSON string containing machine specifications
     }
 
     /**
@@ -28,7 +28,7 @@ library Structs {
      * @dev Used when a staker initiates the unstaking process
      */
     struct Lock {
-        uint256 amount;      // Amount of tokens locked
+        uint256 amount; // Amount of tokens locked
         uint256 unlockAfter; // Epoch after which the locked tokens can be withdrawn
     }
 
@@ -36,12 +36,13 @@ library Structs {
      * @notice Represents a job in the Lumino network
      */
     struct Job {
-        uint256 jobId;           // Unique identifier for the job
-        address creator;         // Address of the job creator
-        address assignee;        // Address of the staker assigned to the job
-        uint32 creationEpoch;    // Epoch when the job was created
-        uint32 executionEpoch;   // Epoch when the job execution started
-        uint32 completionEpoch;  // Epoch when the job was completed
+        uint256 jobId; // Unique identifier for the job
+        address creator; // Address of the job creator
+        address assignee; // Address of the staker assigned to the job
+        uint32 creationEpoch; // Epoch when the job was created
+        uint32 executionEpoch; // Epoch when the job execution started
+        uint32 proofGenerationEpoch; // Epoch when the proof generation started
+        uint32 completionEpoch; // Epoch when the job was completed
         string jobDetailsInJSON; // JSON string containing job details
     }
 
@@ -50,7 +51,7 @@ library Structs {
      * @dev Used during the voting process
      */
     struct JobVerifier {
-        uint256 jobId;     // ID of the job
+        uint256 jobId; // ID of the job
         bytes32 resultHash; // Hash of the job result
     }
 
@@ -58,7 +59,7 @@ library Structs {
      * @notice Represents an assigned job and its result
      */
     struct AssignedJob {
-        uint256 jobId;     // ID of the assigned job
+        uint256 jobId; // ID of the assigned job
         bytes32 resultHash; // Hash of the job result
     }
 
@@ -66,10 +67,10 @@ library Structs {
      * @notice Represents a block in the Lumino network
      */
     struct Block {
-        bool valid;           // Whether the block is valid
-        uint32 proposerId;    // ID of the staker who proposed this block
-        uint256[] jobIds;     // Array of job IDs included in this block
-        uint256 iteration;    // Block iteration number
+        bool valid; // Whether the block is valid
+        uint32 proposerId; // ID of the staker who proposed this block
+        uint256[] jobIds; // Array of job IDs included in this block
+        uint256 iteration; // Block iteration number
         uint256 biggestStake; // Largest stake amount among included jobs
     }
 }
