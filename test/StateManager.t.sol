@@ -25,7 +25,7 @@ contract StateManagerTest is Constants, Test {
 
         State state = stateManager.getState(buffer);
         emit log_uint(uint8(state));
-        assertEq(uint8(state), uint8(State.Commit));
+        assertEq(uint8(state), uint8(State.Assign));
     }
 
     function testRevealState() public {
@@ -37,7 +37,7 @@ contract StateManagerTest is Constants, Test {
 
         State state = stateManager.getState(buffer);
         emit log_uint(uint8(state));
-        assertEq(uint8(state), uint8(State.Reveal));
+        assertEq(uint8(state), uint8(State.Accept));
     }
 
     function testProposeState() public {
@@ -49,7 +49,7 @@ contract StateManagerTest is Constants, Test {
 
         State state = stateManager.getState(buffer);
         emit log_uint(uint8(state));
-        assertEq(uint8(state), uint8(State.Propose));
+        assertEq(uint8(state), uint8(State.Confirm));
     }
 
     function testBufferState() public {

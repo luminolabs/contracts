@@ -33,15 +33,6 @@ library Structs {
     }
 
     /**
-     * @notice Represents a commitment made by a staker during the voting process
-     */
-    struct Commitment {
-        uint32 epoch;           // Epoch for which the commitment is made
-        bytes32 commitmentHash; // Hash of the commitment
-        bool revealed;          // Whether the commitment has been revealed
-    }
-
-    /**
      * @notice Represents a job in the Lumino network
      */
     struct Job {
@@ -69,15 +60,6 @@ library Structs {
     struct AssignedJob {
         uint256 jobId;     // ID of the assigned job
         bytes32 resultHash; // Hash of the job result
-    }
-
-    /**
-     * @notice Represents a Merkle tree used for efficient vote commitments
-     */
-    struct MerkleTree {
-        AssignedJob[] values; // Array of assigned jobs (leaf nodes)
-        bytes32[][] proofs;   // Array of proof paths for each leaf
-        bytes32 root;         // Root of the Merkle tree
     }
 
     /**

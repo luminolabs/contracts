@@ -7,7 +7,6 @@ import "../lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol
 import "../src/Core/ACL.sol";
 import "../src/Core/StakeManager.sol";
 import "../src/Core/JobsManager.sol";
-import "../src/Core/VoteManager.sol";
 import "../src/Core/BlockManager.sol";
 
 /// @title DeployUpgradeableLuminoProtocol
@@ -27,14 +26,12 @@ contract DeployUpgradeableLuminoProtocol is Script {
     ACL public aclImpl;
     StakeManager public stakeManagerImpl;
     JobsManager public jobsManagerImpl;
-    VoteManager public voteManagerImpl;
     BlockManager public blockManagerImpl;
 
     /// @notice The proxy contract instances
     TransparentUpgradeableProxy public aclProxy;
     TransparentUpgradeableProxy public stakeManagerProxy;
     TransparentUpgradeableProxy public jobsManagerProxy;
-    TransparentUpgradeableProxy public voteManagerProxy;
     TransparentUpgradeableProxy public blockManagerProxy;
 
     /// @notice The main function to run the deployment script
@@ -60,7 +57,6 @@ contract DeployUpgradeableLuminoProtocol is Script {
         aclImpl = new ACL();
         stakeManagerImpl = new StakeManager();
         jobsManagerImpl = new JobsManager();
-        voteManagerImpl = new VoteManager();
         blockManagerImpl = new BlockManager();
 
         bytes memory emptyData = "";
@@ -79,11 +75,6 @@ contract DeployUpgradeableLuminoProtocol is Script {
             address(proxyAdmin),
             emptyData
         );
-        voteManagerProxy = new TransparentUpgradeableProxy(
-            address(voteManagerImpl),
-            address(proxyAdmin),
-            emptyData
-        );
         blockManagerProxy = new TransparentUpgradeableProxy(
             address(blockManagerImpl),
             address(proxyAdmin),
@@ -99,7 +90,6 @@ contract DeployUpgradeableLuminoProtocol is Script {
         bytes32 adminRole = acl.DEFAULT_ADMIN_ROLE();
         acl.grantRole(adminRole, address(stakeManagerProxy));
         acl.grantRole(adminRole, address(jobsManagerProxy));
-        acl.grantRole(adminRole, address(voteManagerProxy));
         acl.grantRole(adminRole, address(blockManagerProxy));
     }
 
@@ -108,19 +98,13 @@ contract DeployUpgradeableLuminoProtocol is Script {
     function initializeOtherContracts() internal {
         require(address(stakeManagerProxy) != address(0), "StakeManager Proxy address is zero");
         require(address(jobsManagerProxy) != address(0), "JobsManager Proxy address is zero");
-        require(address(voteManagerProxy) != address(0), "VoteManager Proxy address is zero");
         require(address(blockManagerProxy) != address(0), "BlockManager Proxy address is zero");
 
-        StakeManager(address(stakeManagerProxy)).initialize(address(voteManagerProxy));
+        StakeManager(address(stakeManagerProxy)).initialize();
         JobsManager(address(jobsManagerProxy)).initialize(5);
-        VoteManager(address(voteManagerProxy)).initialize(
-            address(stakeManagerProxy),
-            address(jobsManagerProxy)
-        );
         BlockManager(address(blockManagerProxy)).initialize(
             address(stakeManagerProxy),
             address(jobsManagerProxy),
-            address(voteManagerProxy),
             10 ether
         );
     }
@@ -137,10 +121,6 @@ contract DeployUpgradeableLuminoProtocol is Script {
         console.log(
             "JobsManager Proxy deployed at:",
             address(jobsManagerProxy)
-        );
-        console.log(
-            "VoteManager Proxy deployed at:",
-            address(voteManagerProxy)
         );
         console.log(
             "BlockManager Proxy deployed at:",

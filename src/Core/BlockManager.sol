@@ -8,7 +8,6 @@ import "./storage/BlockStorage.sol";
 import "./StateManager.sol";
 import "./interface/IStakeManager.sol";
 import "./interface/IJobsManager.sol";
-import "./interface/IVoteManager.sol";
 import "../lib/Structs.sol";
 
 /**
@@ -20,7 +19,6 @@ contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
     // Interfaces to interact with other core contracts
     IStakeManager public stakeManager;
     IJobsManager public jobsManager;
-    IVoteManager public voteManager;
 
     /**
      * @notice Emitted when a new block is proposed
@@ -41,20 +39,17 @@ contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
      * @dev Initializes the BlockManager contract.
      * @param _stakeManager Address of the StakeManager contract
      * @param _jobsManager Address of the JobsManager contract
-     * @param _voteManager Address of the VoteManager contract
      * @param _minStakeToPropose Minimum stake required to propose a block
      */
     function initialize(
         address _stakeManager,
         address _jobsManager,
-        address _voteManager,
         uint256 _minStakeToPropose
     ) external initializer {
         // Set up connections to other contracts
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         stakeManager = IStakeManager(_stakeManager);
         jobsManager = IJobsManager(_jobsManager);
-        voteManager = IVoteManager(_voteManager);
 
         // Initialize the block index to be confirmed
         blockIndexToBeConfirmed = -1;
@@ -70,7 +65,7 @@ contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
      */
     function propose(uint32 epoch, uint256[] memory _jobIds)
     external
-    checkEpochAndState(State.Propose, epoch, buffer)
+    checkEpochAndState(State.Confirm, epoch, buffer)
     {
         // Check if the maximum number of blocks for this epoch has been reached
         require(numProposedBlocks < MAX_BLOCKS_PER_EPOCH_PER_STAKER, "Max blocks for epoch reached");
@@ -120,7 +115,7 @@ contract BlockManager is Initializable, BlockStorage, StateManager, ACL {
      */
     function confirmBlock(uint32 epoch)
     external
-    checkEpochAndState(State.Commit, epoch + 1, buffer)
+    checkEpochAndState(State.Assign, epoch + 1, buffer)
     {
         // Ensure there are blocks to confirm and no block has been confirmed yet
         require(sortedProposedBlockIds[epoch].length > 0, "No blocks proposed in the previous epoch");
