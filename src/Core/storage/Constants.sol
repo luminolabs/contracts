@@ -21,11 +21,12 @@ contract Constants {
      * @notice Represents the different statuses of a job
      */
     enum Status {
-        Cancelled, // Job is cancelled
-        Created, // Job is created but not yet started
-        Execution, // Job is currently being executed
-        ProofGeneration, // Proof of job completion is being created
-        Completed // Job is fully completed and verified
+        Cancelled,          // Job is cancelled
+        Created,            // Job is created but not yet assigned
+        Assigned,           // Job is assigned but hasn't started yet
+        Execution,          // Job is currently being executed
+        ProofGeneration,    // Proof of job completion is being created
+        Completed           // Job is fully completed and verified
     }
 
     /**

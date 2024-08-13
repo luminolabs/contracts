@@ -151,6 +151,10 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
         // Reset the lock
         _resetLock(_stakerId);
 
+        // Transfer the amount to the sender
+        (bool success, ) = msg.sender.call{value: withdrawAmount}("");
+        require(success, "Transfer failed");
+        
         // TODO: Transfer LUMINO tokens back to the staker
         // require(lumino.transfer(msg.sender, withdrawAmount), "Token transfer failed");
     }
@@ -164,6 +168,50 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
             amount: 0,
             unlockAfter: 0
         });
+    }
+
+    /**
+     * @dev Retrieves the staker ID associated with a given address.
+     * @param _address The address of the staker
+     * @return The unique identifier (staker ID) associated with the given address
+     */
+    function getStakerId(address _address) external view returns (uint32) {
+        return stakerIds[_address];
+    }
+
+    /**
+     * @dev Retrieves the full staker information for a given staker ID.
+     * @param _id The unique identifier of the staker
+     * @return staker A Staker struct containing all the staker's information
+     */
+    function getStaker(uint32 _id) external view returns (Structs.Staker memory staker) {
+        return stakers[_id];
+    }
+
+    /**
+     * @dev Retrieves the total number of stakers in the Lumino network.
+     * @return The current count of stakers in the system
+     */
+    function getNumStakers() external view returns (uint32) {
+        return numStakers;
+    }
+
+    /**
+     * @dev Retrieves the current stake amount for a given staker.
+     * @param stakerId The unique identifier of the staker
+     * @return The current stake amount of the specified staker
+     */
+    function getStake(uint32 stakerId) external view returns (uint256) {
+        return stakers[stakerId].stake;
+    }
+    
+    /**
+     * @dev Retrieves the locked amount for a given staker.
+     * @param _stakerAddress The unique identifier of the staker
+     * @return locks for the staker
+     */
+    function getLocks(address _stakerAddress) external view returns (Structs.Lock memory) {
+        return locks[_stakerAddress];
     }
 
     // TODO: Implement additional functions such as slashing, reward distribution, etc.

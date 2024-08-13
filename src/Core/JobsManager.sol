@@ -38,7 +38,7 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
      */
     function initialize(
         uint8 _jobsPerStaker
-    ) external initializer onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external initializer {
         // Initialize the job ID counter
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         jobIdCounter = 1;
@@ -51,9 +51,7 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
      * @dev Creates a new job in the system.
      * @param _jobDetailsInJSON A JSON string containing the job details
      */
-    function createJob(
-        string memory _jobDetailsInJSON
-    ) external payable returns (uint256) {
+    function createJob(string memory _jobDetailsInJSON) external payable returns (uint256) {
         // Get the current epoch
         uint32 currentEpoch = getEpoch();
 
@@ -67,6 +65,7 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
             assignee: address(0), // No assignee yet
             creationEpoch: currentEpoch,
             executionEpoch: 0, // Will be set when job starts execution
+            proofGenerationEpoch: 0, // Will be set when staker starts proof generation
             completionEpoch: 0, // Will be set when job is completed
             jobDetailsInJSON: _jobDetailsInJSON
         });
@@ -91,9 +90,11 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
     function updateJobStatus(uint256 _jobId, Status _newStatus) external {
         // Ensure the job exists
         require(jobs[_jobId].jobId != 0, "Job does not exist");
+        // Ensure only Assignee can update the status
+        require(jobs[_jobId].assignee == msg.sender || hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only assignee can update the jobStatus");
 
         // Ensure the new status is a valid progression from the current status
-        require(_newStatus > jobStatus[_jobId], "Invalid status transition");
+        require(uint(_newStatus) == uint(jobStatus[_jobId]) + 1, "Invalid status transition");
 
         // Update the job status
         jobStatus[_jobId] = _newStatus;
@@ -102,6 +103,9 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
         if (_newStatus == Status.Execution) {
             // Record the execution start epoch
             jobs[_jobId].executionEpoch = getEpoch();
+        } else if (_newStatus == Status.Completed) {
+            // Record the execution start epoch
+            jobs[_jobId].proofGenerationEpoch = getEpoch();
         } else if (_newStatus == Status.Completed) {
             // Record the completion epoch
             jobs[_jobId].completionEpoch = getEpoch();
@@ -112,6 +116,8 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
         // Emit an event to log the status update
         emit JobStatusUpdated(_jobId, _newStatus);
     }
+    
+    // TODO: Manual AssignJob function
 
     /**
      * @dev Retrieves the list of active job IDs.
@@ -142,6 +148,9 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
         return jobStatus[_jobId];
     }
 
+    // TODO: visibility to be moved to internal, the seed should fetch from the 
+    // the voteManager/blockManager contracts at the end of each epoch
+    // the seed will be set by the blockProposer of the epoch
     /**
      * @dev Assigns jobs to a staker based on a seed value.
      * @param _seed A random seed used for job assignment
@@ -151,12 +160,18 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
     function getJobsForStaker(
         bytes32 _seed,
         uint32 _stakerId
-    ) external view returns (uint256[] memory) {
+    ) external returns (uint256[] memory) {
         // Ensure there are enough active jobs to assign
         require(activeJobIds.length >= jobsPerStaker, "Not enough active jobs");
 
         // Create an array to store the assigned job IDs
         uint256[] memory assignedJobs = new uint256[](jobsPerStaker);
+
+        for (uint256 i = 0; i < activeJobIds.length; i++) {
+            if (jobStatus[activeJobIds[i]] == Constants.Status.Assigned) {
+                delete activeJobIds[i];
+            }
+        }
 
         // Assign jobs to the staker
         for (uint8 i = 0; i < jobsPerStaker; i++) {
