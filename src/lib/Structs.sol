@@ -40,9 +40,13 @@ library Structs {
         address creator;                // Address of the job creator
         address assignee;               // Address of the staker assigned to the job
         uint32 creationEpoch;           // Epoch when the job was created
+        uint32 queuedEpoch;             // Epoch when the job is assigned
         uint32 executionEpoch;          // Epoch when the job execution started
         uint32 proofGenerationEpoch;    // Epoch when the proof generation started
-        uint32 completionEpoch;         // Epoch when the job was completed
+        uint32 conclusionEpoch;         // Epoch when the job was concluded
+        uint256 creationTimestamp;       // Timestamp when the job was created
+        uint256 lastUpdatedAtTimestamp;
+        uint256 jobFee;
         string jobDetailsInJSON;        // JSON string containing job details
     }
 

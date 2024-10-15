@@ -65,16 +65,20 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
             assignee: address(0), // No assignee yet
             creationEpoch: currentEpoch,
             executionEpoch: 0, // Will be set when job starts execution
+            queuedEpoch: 0, // Will be set when job is completed
+            conclusionEpoch: 0, // Will be set when job is completed
             proofGenerationEpoch: 0, // Will be set when staker starts proof generation
-            completionEpoch: 0, // Will be set when job is completed
+            creationTimestamp: block.timestamp,
+            lastUpdatedAtTimestamp: block.timestamp,
+            jobFee: msg.value,
             jobDetailsInJSON: _jobDetailsInJSON
         });
 
         // Set the initial status of the job
-        jobStatus[newJobId] = Status.Created;
+        jobStatus[newJobId] = Status.NEW;
 
         // Add the new job to the list of active jobs
-        activeJobIds.push(newJobId);
+        // activeJobIds.push(newJobId);
 
         // Emit an event to log the job creation
         emit JobCreated(newJobId, msg.sender, currentEpoch);
@@ -86,31 +90,51 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
      * @dev Updates the status of a job.
      * @param _jobId The ID of the job to update
      * @param _newStatus The new status to set for the job
+     * @param _buffer Buffer from the client
      */
-    function updateJobStatus(uint256 _jobId, Status _newStatus) external {
+    function updateJobStatus(uint256 _jobId, Status _newStatus,uint8 _buffer) external {
+
+        State currentState = getState(_buffer);
+
         // Ensure the job exists
         require(jobs[_jobId].jobId != 0, "Job does not exist");
+        require(jobs[_jobId].conclusionEpoch == 0, "Job has been concluded");
         // Ensure only Assignee can update the status
         require(jobs[_jobId].assignee == msg.sender || hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only assignee can update the jobStatus");
 
         // Ensure the new status is a valid progression from the current status
-        require(uint(_newStatus) == uint(jobStatus[_jobId]) + 1, "Invalid status transition");
+        // require(uint(_newStatus) == uint(jobStatus[_jobId]) + 1, "Invalid status transition");
 
         // Update the job status
         jobStatus[_jobId] = _newStatus;
+        jobs[_jobId].lastUpdatedAtTimestamp = block.timestamp;
 
         // Perform additional actions based on the new status
-        if (_newStatus == Status.Execution) {
+        if (_newStatus == Status.RUNNING) {
+            require(currentState == State.Update, "Can only update job in Update State");
             // Record the execution start epoch
             jobs[_jobId].executionEpoch = getEpoch();
-        } else if (_newStatus == Status.Completed) {
-            // Record the execution start epoch
-            jobs[_jobId].proofGenerationEpoch = getEpoch();
-        } else if (_newStatus == Status.Completed) {
-            // Record the completion epoch
-            jobs[_jobId].completionEpoch = getEpoch();
+            jobStatus[_jobId] = Status.RUNNING;
+        } else if (_newStatus == Status.STOPPING) {
+            require(currentState == State.Update, "Can only update job in Update State");
+            jobStatus[_jobId] = Status.STOPPING;
+        } else if (_newStatus == Status.COMPLETED) {
+            require(currentState == State.Confirm, "Can only complete job in Confirm State");
+            // Record the conclusion epoch
+            jobs[_jobId].conclusionEpoch = getEpoch();
+            jobStatus[_jobId] = Status.COMPLETED;
             // Remove the job from the active jobs list
-            removeActiveJob(_jobId);
+            // removeActiveJob(_jobId);
+        } else if (_newStatus == Status.STOPPED) {
+            require(currentState == State.Confirm, "Can only conclude job in Confirm State");
+            // Record the conclusion epoch
+            jobs[_jobId].conclusionEpoch = getEpoch();
+            jobStatus[_jobId] = Status.STOPPED;
+        } else if (_newStatus == Status.FAILED) {
+            require(currentState == State.Confirm, "Can only conclude job in Confirm State");
+            // Record the conclusion epoch
+            jobs[_jobId].conclusionEpoch = getEpoch();
+            jobStatus[_jobId] = Status.FAILED;
         }
 
         // Emit an event to log the status update
@@ -118,6 +142,28 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
     }
     
     // TODO: Manual AssignJob function
+    function assignJob(uint256 _jobId, address _assignee, uint8 _buffer) external {
+
+        State currentState = getState(_buffer);
+        uint32 currentEpoch = getEpoch();
+        // Ensure the job exists
+        require(jobs[_jobId].jobId != 0, "Job does not exist");
+        // Ensure only Assignee can update the status
+        require(jobs[_jobId].assignee == address(0), "Job is already assigned");
+        require(jobStatus[_jobId] == Status.NEW, "Inappropriate Job Status update");
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Job assigner Role required to assignJob");
+
+        require(currentState == State.Assign, "Can only assign job in Assign State");
+
+        // Update the job status
+        jobStatus[_jobId] = Status.QUEUED;
+        jobs[_jobId].assignee = _assignee;
+        jobs[_jobId].queuedEpoch = currentEpoch;
+        jobs[_jobId].lastUpdatedAtTimestamp = block.timestamp;
+
+        // Emit an event to log the status update
+        // emit JobStatusUpdated(_jobId, _newStatus);
+    }
 
     /**
      * @dev Retrieves the list of active job IDs.
@@ -157,34 +203,34 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
      * @param _stakerId The ID of the staker to assign jobs to
      * @return An array of job IDs assigned to the staker
      */
-    function getJobsForStaker(
-        bytes32 _seed,
-        uint32 _stakerId
-    ) external returns (uint256[] memory) {
-        // Ensure there are enough active jobs to assign
-        require(activeJobIds.length >= jobsPerStaker, "Not enough active jobs");
+    // function getJobsForStaker(
+    //     bytes32 _seed,
+    //     uint32 _stakerId
+    // ) external returns (uint256[] memory) {
+    //     // Ensure there are enough active jobs to assign
+    //     require(activeJobIds.length >= jobsPerStaker, "Not enough active jobs");
 
-        // Create an array to store the assigned job IDs
-        uint256[] memory assignedJobs = new uint256[](jobsPerStaker);
+    //     // Create an array to store the assigned job IDs
+    //     uint256[] memory assignedJobs = new uint256[](jobsPerStaker);
 
-        for (uint256 i = 0; i < activeJobIds.length; i++) {
-            if (jobStatus[activeJobIds[i]] == Constants.Status.Assigned) {
-                delete activeJobIds[i];
-            }
-        }
+    //     for (uint256 i = 0; i < activeJobIds.length; i++) {
+    //         if (jobStatus[activeJobIds[i]] == Constants.Status.Assigned) {
+    //             delete activeJobIds[i];
+    //         }
+    //     }
 
-        // Assign jobs to the staker
-        for (uint8 i = 0; i < jobsPerStaker; i++) {
-            // Use the seed, staker ID, and index to generate a pseudo-random index
-            uint256 index = uint256(
-                keccak256(abi.encodePacked(_seed, _stakerId, i))
-            ) % activeJobIds.length;
-            // Assign the job at the calculated index
-            assignedJobs[i] = activeJobIds[index];
-        }
+    //     // Assign jobs to the staker
+    //     for (uint8 i = 0; i < jobsPerStaker; i++) {
+    //         // Use the seed, staker ID, and index to generate a pseudo-random index
+    //         uint256 index = uint256(
+    //             keccak256(abi.encodePacked(_seed, _stakerId, i))
+    //         ) % activeJobIds.length;
+    //         // Assign the job at the calculated index
+    //         assignedJobs[i] = activeJobIds[index];
+    //     }
 
-        return assignedJobs;
-    }
+    //     return assignedJobs;
+    // }
 
     /**
      * @dev Removes a job from the list of active jobs.
