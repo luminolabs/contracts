@@ -12,7 +12,7 @@ contract Constants {
      */
     enum State {
         Assign, // JobsManager assign jobs to stakers
-        Accept, // Stakers accept the jobs
+        Update, // Stakers accept the jobs
         Confirm, // A Proposer is selected and a block is prooposed
         Buffer // Buffer Transition period between epochs
     }
@@ -21,12 +21,13 @@ contract Constants {
      * @notice Represents the different statuses of a job
      */
     enum Status {
-        Cancelled,          // Job is cancelled
-        Created,            // Job is created but not yet assigned
-        Assigned,           // Job is assigned but hasn't started yet
-        Execution,          // Job is currently being executed
-        ProofGeneration,    // Proof of job completion is being created
-        Completed           // Job is fully completed and verified
+        NEW,
+        QUEUED,
+        RUNNING,
+        STOPPING,
+        STOPPED,
+        COMPLETED,
+        FAILED
     }
 
     /**
