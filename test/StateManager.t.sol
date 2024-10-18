@@ -37,7 +37,7 @@ contract StateManagerTest is Constants, Test {
 
         State state = stateManager.getState(buffer);
         emit log_uint(uint8(state));
-        assertEq(uint8(state), uint8(State.Accept));
+        assertEq(uint8(state), uint8(State.Assign));
     }
 
     function testProposeState() public {
