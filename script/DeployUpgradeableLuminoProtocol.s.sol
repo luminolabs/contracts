@@ -14,11 +14,10 @@ import "../src/Core/BlockManager.sol";
 /// @dev This script uses the TransparentUpgradeableProxy pattern for upgradeable contracts
 contract DeployUpgradeableLuminoProtocol is Script {
     /// @notice The private key of the deployer account
-    // uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-    uint256 deployerPrivateKey = 0x3dd6681bda6458773e9e8aa6b45574b73a953eaea67ff6d9d00795da73e39177;
+    uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
     
     /// @notice The address of the deployer account
-    address deployer = vm.addr(0x3dd6681bda6458773e9e8aa6b45574b73a953eaea67ff6d9d00795da73e39177);
+    address deployer = vm.addr(deployerPrivateKey);
     
     /// @notice The ProxyAdmin contract instance
     ProxyAdmin public proxyAdmin;
