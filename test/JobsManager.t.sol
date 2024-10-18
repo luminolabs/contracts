@@ -39,7 +39,7 @@ contract JobsManagerTest is Test, Constants {
         Structs.Job memory job = jobsManager.getJobDetails(jobId);
         assertEq(job.creator, user1);
         assertEq(job.jobDetailsInJSON, "Test Job Details");
-        assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.Created));
+        assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.NEW));
         
         uint256[] memory activeJobs = jobsManager.getActiveJobs();
         assertEq(activeJobs.length, 1);
@@ -62,20 +62,16 @@ contract JobsManagerTest is Test, Constants {
         uint256 jobId = jobsManager.createJob("Test Job Details");
 
         vm.prank(admin);
-        jobsManager.updateJobStatus(jobId, Status.Assigned);
-        assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.Assigned));
+        jobsManager.updateJobStatus(jobId, Status.QUEUED, 0);
+        assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.QUEUED));
 
         vm.prank(admin);
-        jobsManager.updateJobStatus(jobId, Status.Execution);
-        assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.Execution));
+        jobsManager.updateJobStatus(jobId, Status.RUNNING, 0);
+        assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.RUNNING));
 
         vm.prank(admin);
-        jobsManager.updateJobStatus(jobId, Status.ProofGeneration);
-        assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.ProofGeneration));
-
-        vm.prank(admin);
-        jobsManager.updateJobStatus(jobId, Status.Completed);
-        assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.Completed));
+        jobsManager.updateJobStatus(jobId, Status.COMPLETED, 0);
+        assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.COMPLETED));
 
         // uint256[] memory activeJobs = jobsManager.getActiveJobs();
         // assertEq(activeJobs.length, 0);
@@ -87,13 +83,13 @@ contract JobsManagerTest is Test, Constants {
 
         vm.expectRevert("Invalid status transition");
         vm.prank(admin);
-        jobsManager.updateJobStatus(jobId, Status.Completed);
+        jobsManager.updateJobStatus(jobId, Status.COMPLETED, 0);
     }
 
     function testUpdateNonExistentJob() public {
         vm.expectRevert("Job does not exist");
         vm.prank(admin);
-        jobsManager.updateJobStatus(999, Status.Assigned);
+        jobsManager.updateJobStatus(999, Status.QUEUED, 0);
     }
 
     function testUpdateJobStatusUnauthorized() public {
@@ -102,38 +98,7 @@ contract JobsManagerTest is Test, Constants {
 
         vm.expectRevert("Only assignee can update the jobStatus");
         vm.prank(user2);
-        jobsManager.updateJobStatus(jobId, Status.Assigned);
-    }
-
-    function testGetJobsForStaker() public {
-        // Create some jobs
-        vm.startPrank(user1);
-        for (uint i = 0; i < 10; i++) {
-            jobsManager.createJob(string(abi.encodePacked("Job ", vm.toString(i))));
-        }
-        vm.stopPrank();
-
-        bytes32 seed = keccak256("test seed");
-        uint32 stakerId = 1;
-
-        uint256[] memory assignedJobs = jobsManager.getJobsForStaker(seed, stakerId);
-        assertEq(assignedJobs.length, 5); // Should match jobsPerStaker
-
-        // Verify that all assigned jobs are valid
-        for (uint i = 0; i < assignedJobs.length; i++) {
-            assertTrue(assignedJobs[i] > 0 && assignedJobs[i] <= 10);
-        }
-    }
-
-    function testGetJobsForStakerInsufficientJobs() public {
-        vm.prank(user1);
-        jobsManager.createJob("Single Job");
-
-        bytes32 seed = keccak256("test seed");
-        uint32 stakerId = 1;
-
-        vm.expectRevert("Not enough active jobs");
-        jobsManager.getJobsForStaker(seed, stakerId);
+        jobsManager.updateJobStatus(jobId, Status.QUEUED, 0);
     }
 
     function testGetActiveJobs() public {
@@ -181,7 +146,7 @@ contract JobsManagerTest is Test, Constants {
         assertEq(job.creationEpoch, jobsManager.getEpoch());
         assertEq(job.executionEpoch, 0);
         assertEq(job.proofGenerationEpoch, 0);
-        assertEq(job.completionEpoch, 0);
+        assertEq(job.conclusionEpoch, 0);
         assertEq(job.jobDetailsInJSON, "Detailed Job Info");
     }
 

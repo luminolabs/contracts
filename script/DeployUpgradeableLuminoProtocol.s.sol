@@ -26,13 +26,13 @@ contract DeployUpgradeableLuminoProtocol is Script {
     ACL public aclImpl;
     StakeManager public stakeManagerImpl;
     JobsManager public jobsManagerImpl;
-    BlockManager public blockManagerImpl;
+    // BlockManager public blockManagerImpl;
 
     /// @notice The proxy contract instances
     TransparentUpgradeableProxy public aclProxy;
     TransparentUpgradeableProxy public stakeManagerProxy;
     TransparentUpgradeableProxy public jobsManagerProxy;
-    TransparentUpgradeableProxy public blockManagerProxy;
+    // TransparentUpgradeableProxy public blockManagerProxy;
 
     /// @notice The main function to run the deployment script
     /// @dev This function deploys all contracts, initializes them, and logs their addresses
@@ -42,7 +42,7 @@ contract DeployUpgradeableLuminoProtocol is Script {
 
         deployContracts();
         initializeACL();
-        // initializeOtherContracts();
+        initializeOtherContracts();
 
         vm.stopBroadcast();
 
@@ -57,7 +57,7 @@ contract DeployUpgradeableLuminoProtocol is Script {
         aclImpl = new ACL();
         stakeManagerImpl = new StakeManager();
         jobsManagerImpl = new JobsManager();
-        blockManagerImpl = new BlockManager();
+        // blockManagerImpl = new BlockManager();
 
         bytes memory emptyData = "";
         aclProxy = new TransparentUpgradeableProxy(
@@ -75,11 +75,11 @@ contract DeployUpgradeableLuminoProtocol is Script {
             address(proxyAdmin),
             emptyData
         );
-        blockManagerProxy = new TransparentUpgradeableProxy(
-            address(blockManagerImpl),
-            address(proxyAdmin),
-            emptyData
-        );
+        // blockManagerProxy = new TransparentUpgradeableProxy(
+        //     address(blockManagerImpl),
+        //     address(proxyAdmin),
+        //     emptyData
+        // );
     }
 
     /// @notice Initializes the ACL contract
@@ -90,7 +90,7 @@ contract DeployUpgradeableLuminoProtocol is Script {
         bytes32 adminRole = acl.DEFAULT_ADMIN_ROLE();
         acl.grantRole(adminRole, address(stakeManagerProxy));
         acl.grantRole(adminRole, address(jobsManagerProxy));
-        acl.grantRole(adminRole, address(blockManagerProxy));
+        // acl.grantRole(adminRole, address(blockManagerProxy));
     }
 
     /// @notice Initializes other core contracts
@@ -98,15 +98,15 @@ contract DeployUpgradeableLuminoProtocol is Script {
     function initializeOtherContracts() internal {
         require(address(stakeManagerProxy) != address(0), "StakeManager Proxy address is zero");
         require(address(jobsManagerProxy) != address(0), "JobsManager Proxy address is zero");
-        require(address(blockManagerProxy) != address(0), "BlockManager Proxy address is zero");
+        // require(address(blockManagerProxy) != address(0), "BlockManager Proxy address is zero");
 
         StakeManager(address(stakeManagerProxy)).initialize();
         JobsManager(address(jobsManagerProxy)).initialize(5);
-        BlockManager(address(blockManagerProxy)).initialize(
-            address(stakeManagerProxy),
-            address(jobsManagerProxy),
-            10 ether
-        );
+        // BlockManager(address(blockManagerProxy)).initialize(
+        //     address(stakeManagerProxy),
+        //     address(jobsManagerProxy),
+        //     10 ether
+        // );
     }
 
     /// @notice Logs the addresses of all deployed contracts
@@ -122,9 +122,9 @@ contract DeployUpgradeableLuminoProtocol is Script {
             "JobsManager Proxy deployed at:",
             address(jobsManagerProxy)
         );
-        console.log(
-            "BlockManager Proxy deployed at:",
-            address(blockManagerProxy)
-        );
+        // console.log(
+        //     "BlockManager Proxy deployed at:",
+        //     address(blockManagerProxy)
+        // );
     }
 }
