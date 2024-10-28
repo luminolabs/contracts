@@ -56,18 +56,15 @@ contract StateManager is Constants {
      */
     function getState(uint8 buffer) public view returns (State) {
         // Calculate the length of each state within an epoch
-        uint16 stateLength = EPOCH_LENGTH / NUM_STATES;
+        uint8 lowerLimit = buffer;
 
-        // Calculate the current position within the current state
-        uint16 statePosition = uint16(block.timestamp % stateLength);
+        uint16 upperLimit = EPOCH_LENGTH / NUM_STATES - buffer;
 
-        // Check if we're in the buffer period
-        if (statePosition < buffer || statePosition > (stateLength - buffer)) {
+        if (block.timestamp % (EPOCH_LENGTH / NUM_STATES) > upperLimit || block.timestamp % (EPOCH_LENGTH / NUM_STATES) < lowerLimit) {
             return State.Buffer;
         }
 
-        // Calculate the current state based on the timestamp
-        uint8 stateIndex = uint8((block.timestamp / stateLength) % NUM_STATES);
-        return State(stateIndex);
+        uint8 state = uint8(((block.timestamp) / (EPOCH_LENGTH / NUM_STATES)) % (NUM_STATES));
+        return State(state);
     }
 }
