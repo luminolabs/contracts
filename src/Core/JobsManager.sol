@@ -31,6 +31,7 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
      * @param newStatus The new status of the job
      */
     event JobStatusUpdated(uint256 indexed jobId, Status newStatus);
+    event JobAssigned(uint256 indexed jobId, address indexed assigneeAddress);
 
     /**
      * @dev Initializes the JobsManager contract.
@@ -56,7 +57,8 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
         uint32 currentEpoch = getEpoch();
 
         // Generate a new unique job ID
-        uint256 newJobId = jobIdCounter++;
+        uint256 newJobId = jobIdCounter;
+        jobIdCounter++;
 
         // Create and store the new job
         jobs[newJobId] = Structs.Job({
@@ -78,7 +80,7 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
         jobStatus[newJobId] = Status.NEW;
 
         // Add the new job to the list of active jobs
-        // activeJobIds.push(newJobId);
+        activeJobIds.push(newJobId);
 
         // Emit an event to log the job creation
         emit JobCreated(newJobId, msg.sender, currentEpoch);
@@ -115,9 +117,9 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
             // Record the execution start epoch
             jobs[_jobId].executionEpoch = getEpoch();
             jobStatus[_jobId] = Status.RUNNING;
-        } else if (_newStatus == Status.STOPPING) {
-            require(currentState == State.Update, "Can only update job in Update State");
-            jobStatus[_jobId] = Status.STOPPING;
+        // } else if (_newStatus == Status.STOPPING) {
+        //     require(currentState == State.Update, "Can only update job in Update State");
+        //     jobStatus[_jobId] = Status.STOPPING;
         } else if (_newStatus == Status.COMPLETED) {
             require(currentState == State.Confirm, "Can only complete job in Confirm State");
             // Record the conclusion epoch
@@ -125,11 +127,11 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
             jobStatus[_jobId] = Status.COMPLETED;
             // Remove the job from the active jobs list
             // removeActiveJob(_jobId);
-        } else if (_newStatus == Status.STOPPED) {
-            require(currentState == State.Confirm, "Can only conclude job in Confirm State");
-            // Record the conclusion epoch
-            jobs[_jobId].conclusionEpoch = getEpoch();
-            jobStatus[_jobId] = Status.STOPPED;
+        // } else if (_newStatus == Status.STOPPED) {
+        //     require(currentState == State.Confirm, "Can only conclude job in Confirm State");
+        //     // Record the conclusion epoch
+        //     jobs[_jobId].conclusionEpoch = getEpoch();
+        //     jobStatus[_jobId] = Status.STOPPED;
         } else if (_newStatus == Status.FAILED) {
             require(currentState == State.Confirm, "Can only conclude job in Confirm State");
             // Record the conclusion epoch
@@ -157,12 +159,19 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
 
         // Update the job status
         jobStatus[_jobId] = Status.QUEUED;
+        assignedJob[_assignee] = _jobId;
         jobs[_jobId].assignee = _assignee;
         jobs[_jobId].queuedEpoch = currentEpoch;
         jobs[_jobId].lastUpdatedAtTimestamp = block.timestamp;
+        
+        for (uint256 i = 0; i < activeJobIds.length; i++) {
+            if (activeJobIds[i] == _jobId) {
+                delete activeJobIds[i];
+            }
+        }
 
         // Emit an event to log the status update
-        // emit JobStatusUpdated(_jobId, _newStatus);
+        emit JobAssigned(_jobId, _assignee);
     }
 
     /**
@@ -231,6 +240,17 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
 
     //     return assignedJobs;
     // }
+    
+    /**
+     * @dev Fetches the job to a staker.
+     * @param _stakerAddress the address of the staker
+     * @return An array of job IDs assigned to the staker
+     */
+    function getJobForStaker(
+        address _stakerAddress
+    ) external view returns (uint256) {
+        return assignedJob[_stakerAddress];
+    }
 
     /**
      * @dev Removes a job from the list of active jobs.

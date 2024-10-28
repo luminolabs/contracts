@@ -16,3 +16,5 @@ docs/
 .vscode
 /lib/*
 .idea
+
+repopack-output.txt

@@ -24,8 +24,6 @@ contract Constants {
         NEW,
         QUEUED,
         RUNNING,
-        STOPPING,
-        STOPPED,
         COMPLETED,
         FAILED
     }
@@ -39,7 +37,7 @@ contract Constants {
      * @notice Duration of an epoch in seconds
      * @dev 1200 seconds = 20 minutes
      */
-    uint16 public constant EPOCH_LENGTH = 1200;
+    uint16 public constant EPOCH_LENGTH = 60;
 
     /**
      * @notice Minimum amount of stake required to become a staker
@@ -56,7 +54,7 @@ contract Constants {
     /**
      * @notice Buffer time in seconds for state transitions
      */
-    uint8 public buffer = 5;
+    uint8 public buffer = 0;
 
     /**
      * @notice Number of epochs for which stake is locked after calling unstake()
