@@ -14,7 +14,6 @@ import "./ACL.sol";
  */
 
 contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
-
     // TODO: Uncomment and implement these interfaces when ready
     // IERC20 public lumino;
 
@@ -84,7 +83,7 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
                 age: 0,
                 epochFirstStaked: _epoch,
                 epochLastPenalized: 0,
-                stake: _amount,
+                stake: 0,
                 stakerReward: 0,
                 machineSpecInJSON: _machineSpecInJSON
             });
@@ -92,8 +91,6 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
             // Existing staker
             require(!stakers[stakerId].isSlashed, "Staker is slashed");
 
-            // Increase the staker's existing stake
-            stakers[stakerId].stake = stakers[stakerId].stake + _amount;
         }
 
         // TODO: Transfer LUMINO tokens from the staker to this contract
@@ -154,7 +151,7 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
         // Transfer the amount to the sender
         (bool success, ) = msg.sender.call{value: withdrawAmount}("");
         require(success, "Transfer failed");
-        
+
         // TODO: Transfer LUMINO tokens back to the staker
         // require(lumino.transfer(msg.sender, withdrawAmount), "Token transfer failed");
     }
@@ -184,7 +181,9 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
      * @param _id The unique identifier of the staker
      * @return staker A Staker struct containing all the staker's information
      */
-    function getStaker(uint32 _id) external view returns (Structs.Staker memory staker) {
+    function getStaker(
+        uint32 _id
+    ) external view returns (Structs.Staker memory staker) {
         return stakers[_id];
     }
 
@@ -204,13 +203,15 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
     function getStake(uint32 stakerId) external view returns (uint256) {
         return stakers[stakerId].stake;
     }
-    
+
     /**
      * @dev Retrieves the locked amount for a given staker.
      * @param _stakerAddress The unique identifier of the staker
      * @return locks for the staker
      */
-    function getLocks(address _stakerAddress) external view returns (Structs.Lock memory) {
+    function getLocks(
+        address _stakerAddress
+    ) external view returns (Structs.Lock memory) {
         return locks[_stakerAddress];
     }
 
