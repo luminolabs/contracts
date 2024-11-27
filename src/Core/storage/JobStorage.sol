@@ -23,6 +23,8 @@ abstract contract JobStorage is Constants {
      */
     mapping(uint256 => Status) public jobStatus;
 
+    mapping (address => uint256) assignedJob;
+
     /**
      * @notice List of all active job IDs
      * @dev Used to iterate over active jobs efficiently
