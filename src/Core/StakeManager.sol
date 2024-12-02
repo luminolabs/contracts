@@ -83,7 +83,7 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
                 age: 0,
                 epochFirstStaked: _epoch,
                 epochLastPenalized: 0,
-                stake: 0,
+                stake: _amount,
                 stakerReward: 0,
                 machineSpecInJSON: _machineSpecInJSON
             });
@@ -91,6 +91,8 @@ contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
             // Existing staker
             require(!stakers[stakerId].isSlashed, "Staker is slashed");
 
+            // Increase the staker's existing stake
+            stakers[stakerId].stake = stakers[stakerId].stake + _amount;
         }
 
         // TODO: Transfer LUMINO tokens from the staker to this contract
