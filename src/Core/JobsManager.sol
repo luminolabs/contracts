@@ -6,6 +6,7 @@ import "./ACL.sol";
 import "./StateManager.sol";
 import "../lib/Structs.sol";
 import "../Core/storage/JobStorage.sol";
+import "../Core/interface/IStakeManager.sol";
 
 /**
  * @title JobsManager
@@ -13,6 +14,9 @@ import "../Core/storage/JobStorage.sol";
  * This contract handles job-related operations and maintains job states.
  */
 contract JobsManager is Initializable, StateManager, ACL, JobStorage {
+
+    IStakeManager public stakeManager;
+
     /**
      * @notice Emitted when a new job is created
      * @param jobId The ID of the newly created job
@@ -38,7 +42,8 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
      * @param _jobsPerStaker The number of jobs to be assigned per staker
      */
     function initialize(
-        uint8 _jobsPerStaker
+        uint8 _jobsPerStaker,
+        address _stakeManager
     ) external initializer {
         // Initialize the job ID counter
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -46,6 +51,7 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
 
         // Set the number of jobs to be assigned per staker
         jobsPerStaker = _jobsPerStaker;
+        stakeManager = IStakeManager(_stakeManager);
     }
 
     /**
@@ -127,6 +133,11 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
             jobStatus[_jobId] = Status.COMPLETED;
             // Remove the job from the active jobs list
             // removeActiveJob(_jobId);
+            // Transfer job fee to the assignee
+            address payable assignee = payable(jobs[_jobId].assignee);
+            uint256 jobFee = jobs[_jobId].jobFee;
+            (bool success, ) = assignee.call{value: jobFee}("");
+            require(success, "Fee transfer failed");
         // } else if (_newStatus == Status.STOPPED) {
         //     require(currentState == State.Confirm, "Can only conclude job in Confirm State");
         //     // Record the conclusion epoch
@@ -156,6 +167,15 @@ contract JobsManager is Initializable, StateManager, ACL, JobStorage {
         require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Job assigner Role required to assignJob");
 
         require(currentState == State.Assign, "Can only assign job in Assign State");
+
+        // Check if assignee is an active staker
+        uint32 stakerId = stakeManager.getStakerId(_assignee);
+        require(stakerId != 0, "Assignee is not a registered staker");
+
+         // Get staker info and verify they're active
+        Structs.Staker memory staker = stakeManager.getStaker(stakerId);
+        require(staker.stake > 0, "Assignee has no active stake");
+        require(!staker.isSlashed, "Assignee has been slashed");
 
         // Update the job status
         jobStatus[_jobId] = Status.QUEUED;

@@ -6,6 +6,7 @@ import "../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol
 import "./storage/StakeManagerStorage.sol";
 import "./StateManager.sol";
 import "./ACL.sol";
+import "../Core/interface/IJobsManager.sol";
 
 /**
  * @title StakeManager
@@ -13,14 +14,16 @@ import "./ACL.sol";
  * This contract handles the core staking mechanics of the system.
  */
 
-contract StakeManager is Initializable, StakeManagerStorage, StateManager, ACL {
+contract StakeManager is Initializable, ACL, StakeManagerStorage, StateManager {
     // TODO: Uncomment and implement these interfaces when ready
     // IERC20 public lumino;
+    IJobsManager public jobsManager;
 
-    function initialize() public initializer {
+    function initialize(address _jobsManager) public override initializer {
         // Initialize contract state here
         // lumino = IERC20(_luminoAddress);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        jobsManager = IJobsManager(_jobsManager);
     }
 
     /**
