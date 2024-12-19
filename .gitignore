@@ -17,4 +17,6 @@ docs/
 /lib/*
 .idea
 
+node_modules
+
 repomix-output.txt
