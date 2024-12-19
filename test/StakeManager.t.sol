@@ -3,10 +3,12 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../src/Core/StakeManager.sol";
+import "../src/Core/JobsManager.sol";
 import "../src/Core/storage/Constants.sol";
 
 contract StakeManagerTest is Test, Constants {
     StakeManager public stakeManager;
+    JobsManager public jobsManager;
     address public admin;
     address public staker1;
     address public staker2;
@@ -16,15 +18,19 @@ contract StakeManagerTest is Test, Constants {
         staker1 = address(0x1);
         staker2 = address(0x2);
 
+        // Deploy JobManager first
+        jobsManager = new JobsManager();
+        jobsManager.initialize(5, address(0)); // Initialize with a dummy jobs manager address first
+
         stakeManager = new StakeManager();
-        stakeManager.initialize();
+        stakeManager.initialize(address(jobsManager));
 
         // Fund stakers with some ETH for testing
         vm.deal(staker1, 100 ether);
         vm.deal(staker2, 100 ether);
     }
 
-    function testInitialization() public {
+    function testInitialization() public view {
         assertEq(stakeManager.numStakers(), 0);
         assertTrue(stakeManager.hasRole(stakeManager.DEFAULT_ADMIN_ROLE(), admin));
     }
