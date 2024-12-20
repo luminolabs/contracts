@@ -14,7 +14,7 @@ env:
   RPC_URL: ${{ secrets.RPC_URL }}
 
 jobs:
-  check:
+  unit-tests:
     name: Foundry project
     runs-on: ubuntu-latest
     steps:
@@ -76,12 +76,14 @@ jobs:
           pip3 install slither-analyzer
 
       - name: Run Slither
-        run: slither . --sarif slither.sarif || true
+        run: |
+          forge build
+          slither . --sarif slither-results.sarif || true
 
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v2
         with:
-          sarif_file: slither.sarif
+          sarif_file: slither-results.sarif
 
   lint:
     name: Format Check
