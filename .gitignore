@@ -17,6 +17,8 @@ docs/
 /lib/*
 .idea
 
+slither-results.sarif
+
 node_modules
 
 repomix-output.txt
