@@ -1,4 +1,4 @@
-name: Lumino Protocol CI
+name: Lumino Protocol CI/CD
 
 on:
   pull_request:
@@ -6,12 +6,20 @@ on:
       - "**"
       - '!main'
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'testnet'
+        type: choice
+        options:
+          - testnet
 
 env:
   FOUNDRY_PROFILE: ci
   PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
   ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
-  RPC_URL: ${{ secrets.RPC_URL }}
+  TESTNET_RPC_URL: ${{ secrets.TESTNET_RPC_URL }}
 
 jobs:
   unit-tests:
@@ -84,6 +92,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: slither-results.sarif
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   lint:
     name: Format Check
@@ -109,3 +118,38 @@ jobs:
 
       - name: Check formatting
         run: npx prettier --check "src/**/*.sol" "test/**/*.sol"
+
+  deploy-testnet:
+    name: Deploy to Testnet
+    needs: [unit-tests, slither, lint]
+    if: |
+      (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'testnet')
+    runs-on: ubuntu-latest
+    environment: testnet
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Deploy to Testnet
+        env:
+          RPC_URL: ${{ env.TESTNET_RPC_URL }}
+        run: |
+          forge script script/DeployUpgradeableLuminoProtocol.s.sol:DeployUpgradeableLuminoProtocol \
+            --rpc-url $RPC_URL \
+            --broadcast \
+            --verify \
+            -vvvv
+
+      - name: Save deployment artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: testnet-deployment
+          path: broadcast/
+          if-no-files-found: error
