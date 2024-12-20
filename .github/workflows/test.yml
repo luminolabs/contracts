@@ -44,7 +44,13 @@ jobs:
         id: build
 
       - name: Check gas snapshots
-        run: forge snapshot --check
+        run: |
+          forge snapshot --check || (
+            echo "Gas snapshot check failed. Generating new snapshot for reference..."
+            forge snapshot
+            echo "Please commit the updated .gas-snapshot file"
+            exit 1
+          )
         id: snapshot
 
       - name: Run tests
