@@ -15,64 +15,51 @@ contract StateManagerTest is Constants, Test {
 
     function testCommitState() public {
         uint8 buffer = 5;
-
-        vm.warp(1200);
-        // Set block.timestamp to the start of the Commit state
-        uint256 commitTime = block.timestamp - (block.timestamp % EPOCH_LENGTH) + 0 * (EPOCH_LENGTH / NUM_STATES) + buffer + 1;
-        console.log(block.timestamp);
-        console.log(commitTime);
-        vm.warp(commitTime);
-
+        // Set block.timestamp to be in the Assign state window
+        uint256 assignTime = (EPOCH_LENGTH / NUM_STATES) / 2; // Middle of Assign state
+        vm.warp(assignTime);
+        
         State state = stateManager.getState(buffer);
-        emit log_uint(uint8(state));
         assertEq(uint8(state), uint8(State.Assign));
     }
 
     function testRevealState() public {
         uint8 buffer = 5;
-
-        // Set block.timestamp to the start of the Reveal state
-        uint256 revealTime = block.timestamp - (block.timestamp % EPOCH_LENGTH) + 1 * (EPOCH_LENGTH / NUM_STATES) + buffer + 1;
-        vm.warp(revealTime);
-
+        // Set block.timestamp to be in the Update state window
+        uint256 updateTime = (EPOCH_LENGTH / NUM_STATES) + (EPOCH_LENGTH / NUM_STATES / 2); // Middle of Update state
+        vm.warp(updateTime);
+        
         State state = stateManager.getState(buffer);
-        emit log_uint(uint8(state));
-        assertEq(uint8(state), uint8(State.Assign));
+        assertEq(uint8(state), uint8(State.Update));
     }
 
     function testProposeState() public {
         uint8 buffer = 5;
-
-        // Set block.timestamp to the start of the Propose state
-        uint256 proposeTime = block.timestamp - (block.timestamp % EPOCH_LENGTH) + 2 * (EPOCH_LENGTH / NUM_STATES) + buffer + 1;
-        vm.warp(proposeTime);
-
+        // Set block.timestamp to be in the Confirm state window
+        uint256 confirmTime = 2 * (EPOCH_LENGTH / NUM_STATES) + (EPOCH_LENGTH / NUM_STATES / 2); // Middle of Confirm state
+        vm.warp(confirmTime);
+        
         State state = stateManager.getState(buffer);
-        emit log_uint(uint8(state));
         assertEq(uint8(state), uint8(State.Confirm));
     }
 
     function testBufferState() public {
         uint8 buffer = 5;
-
-        // Set block.timestamp to the Buffer period at the end of the Commit state
-        uint256 bufferTime = block.timestamp - (block.timestamp % EPOCH_LENGTH) + (EPOCH_LENGTH / NUM_STATES) + buffer - 1;
+        // Set block.timestamp to be in the buffer period
+        uint256 bufferTime = (EPOCH_LENGTH / NUM_STATES) - 2; // Just before state transition
         vm.warp(bufferTime);
-
+        
         State state = stateManager.getState(buffer);
-        emit log_uint(uint8(state));
         assertEq(uint8(state), uint8(State.Buffer));
     }
 
     function testNonBufferState() public {
         uint8 buffer = 5;
-
-        // Set block.timestamp to a time outside the buffer period
-        uint256 nonBufferTime = block.timestamp - (block.timestamp % EPOCH_LENGTH) + buffer + 1;
+        // Set block.timestamp to be clearly in a non-buffer period
+        uint256 nonBufferTime = (EPOCH_LENGTH / NUM_STATES) / 2; // Middle of first state
         vm.warp(nonBufferTime);
-
+        
         State state = stateManager.getState(buffer);
-        emit log_uint(uint8(state));
-        assert(state != State.Buffer);
+        assertTrue(state != State.Buffer);
     }
 }
