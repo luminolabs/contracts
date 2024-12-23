@@ -36,7 +36,7 @@ contract StakeManagerTest is Test, Constants {
         vm.deal(staker2, 100 ether);
     }
 
-    function testInitialization() public {
+    function testInitialization() public view {
         assertTrue(stakeManager.hasRole(stakeManager.DEFAULT_ADMIN_ROLE(), admin));
         assertEq(stakeManager.numStakers(), 0);
     }
