@@ -57,9 +57,10 @@ jobs:
         id: test
 
       - name: Run coverage
-        run: forge coverage --report lcov --report summary \
-          --optimize \
-          --optimizer-runs 200 \
+        run: forge coverage --report lcov --report summary
+          --report debug
+          --optimize
+          --optimizer-runs 200
           --no-auto-detect  
         id: coverage
 
