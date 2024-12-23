@@ -14,9 +14,7 @@ docs/
 .env
 
 .vscode
-/lib/*
 .idea
-lib
 
 slither-results.sarif
 
