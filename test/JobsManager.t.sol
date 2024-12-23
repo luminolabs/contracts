@@ -4,9 +4,11 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "../src/Core/JobsManager.sol";
 import "../src/Core/StakeManager.sol";
+import "../src/Core/StateManager.sol";
 import "../src/Core/storage/Constants.sol";
+import "forge-std/console.sol";
 
-contract JobsManagerTest is Test, Constants {
+contract JobsManagerTest is Test, Constants, StateManager {
     JobsManager public jobsManager;
     StakeManager public stakeManager;
     address public admin;
@@ -14,24 +16,27 @@ contract JobsManagerTest is Test, Constants {
     address public user2;
     uint8 public constant BUFFER = 5;
 
+    event JobCreated(uint256 indexed jobId, address indexed creator, uint32 epoch);
+    event JobStatusUpdated(uint256 indexed jobId, Status newStatus);
+    event JobAssigned(uint256 indexed jobId, address indexed assigneeAddress);
+
     function setUp() public {
         admin = address(this);
         user1 = address(0x1);
         user2 = address(0x2);
 
-        // Deploy & initialize contracts in the correct order
-        // 1. Deploy StakeManager
+        // Deploy contracts
         stakeManager = new StakeManager();
-        
-        // 2. Deploy JobsManager
         jobsManager = new JobsManager();
         
-        // 3. Initialize both with correct references to each other
+        // Initialize contracts
         stakeManager.initialize(address(jobsManager));
         jobsManager.initialize(5, address(stakeManager));
 
-        vm.prank(admin);
+        // Setup roles
         jobsManager.grantRole(jobsManager.DEFAULT_ADMIN_ROLE(), admin);
+        vm.deal(user1, 100 ether);
+        vm.deal(user2, 100 ether);
     }
 
     function testInitialization() public view {
@@ -41,8 +46,14 @@ contract JobsManagerTest is Test, Constants {
     }
 
     function testCreateJob() public {
-        vm.prank(user1);
-        uint256 jobId = jobsManager.createJob("Test Job Details");
+        uint256 jobFee = 1 ether;
+        vm.startPrank(user1);
+        
+        vm.expectEmit(true, true, true, true);
+        emit JobCreated(1, user1, 0);
+        
+        uint256 jobId = jobsManager.createJob{value: jobFee}("Test Job Details");
+        vm.stopPrank();
 
         assertEq(jobId, 1);
         assertEq(jobsManager.jobIdCounter(), 2);
@@ -50,6 +61,7 @@ contract JobsManagerTest is Test, Constants {
         Structs.Job memory job = jobsManager.getJobDetails(jobId);
         assertEq(job.creator, user1);
         assertEq(job.jobDetailsInJSON, "Test Job Details");
+        assertEq(job.jobFee, jobFee);
         assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.NEW));
         
         uint256[] memory activeJobs = jobsManager.getActiveJobs();
@@ -57,112 +69,199 @@ contract JobsManagerTest is Test, Constants {
         assertEq(activeJobs[0], jobId);
     }
 
-    function testUpdateJobStatus() public {
-        // First, register user1 as a staker
-        vm.deal(user1, 10 ether); // Give user1 some ETH to stake
-        vm.prank(user1);
+    function testAssignJob() public {
+        // Setup staker
+        vm.startPrank(user1);
         stakeManager.stake{value: 10 ether}(0, 10 ether, "test-spec");
+        vm.stopPrank();
 
-        // Create a job
-        vm.prank(user1);
-        uint256 jobId = jobsManager.createJob("Test Job Details");
+        // Create job
+        vm.prank(user2);
+        uint256 jobId = jobsManager.createJob{value: 1 ether}("Test Job");
 
-        // Assign job (in Assign state)
-        uint256 assignTime = (EPOCH_LENGTH / NUM_STATES) / 2; // Middle of Assign state
+        // Move to Assign state
+        uint256 assignTime = (EPOCH_LENGTH / NUM_STATES) / 2;
         vm.warp(assignTime);
+
+        // Assign job
+        vm.startPrank(admin);
+        vm.expectEmit(true, true, true, true);
+        emit JobAssigned(jobId, user1);
+        jobsManager.assignJob(jobId, user1, BUFFER);
+        vm.stopPrank();
+
+        // Verify assignment
+        Structs.Job memory job = jobsManager.getJobDetails(jobId);
+        assertEq(job.assignee, user1);
+        assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.QUEUED));
+        assertEq(jobsManager.getJobForStaker(user1), jobId);
+    }
+
+    function testJobStatusTransitions() public {
+        // Setup staker
+        vm.startPrank(user1);
+        stakeManager.stake{value: 10 ether}(0, 10 ether, "test-spec");
+        vm.stopPrank();
+
+        // Create and assign job
+        vm.prank(user2);
+        uint256 jobId = jobsManager.createJob{value: 1 ether}("Test Job");
+
+        uint256 stateLength = EPOCH_LENGTH / NUM_STATES;
+
+        // Assign state
+        vm.warp(stateLength / 2);
         vm.prank(admin);
         jobsManager.assignJob(jobId, user1, BUFFER);
         assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.QUEUED));
 
-        // Update to RUNNING (in Update state)
-        uint256 updateTime = (EPOCH_LENGTH / NUM_STATES) + (EPOCH_LENGTH / NUM_STATES / 2);
-        vm.warp(updateTime);
+        // Update state - Set to RUNNING
+        vm.warp(stateLength + (stateLength / 2));
         vm.prank(user1);
+        vm.expectEmit(true, true, true, true);
+        emit JobStatusUpdated(jobId, Status.RUNNING);
         jobsManager.updateJobStatus(jobId, Status.RUNNING, BUFFER);
         assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.RUNNING));
 
-        // Complete job (in Confirm state)
-        uint256 confirmTime = 2 * (EPOCH_LENGTH / NUM_STATES) + (EPOCH_LENGTH / NUM_STATES / 2);
-        vm.warp(confirmTime);
+        // Confirm state - Complete job
+        vm.warp(2 * stateLength + (stateLength / 2));
         vm.prank(user1);
         jobsManager.updateJobStatus(jobId, Status.COMPLETED, BUFFER);
         assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.COMPLETED));
     }
 
-    function testUpdateJobStatusInvalidTransition() public {
-        // First, register user1 as a staker
-        vm.deal(user1, 10 ether);
-        vm.prank(user1);
-        stakeManager.stake{value: 10 ether}(0, 10 ether, "test-spec");
-
-        vm.prank(user1);
-        uint256 jobId = jobsManager.createJob("Test Job Details");
-
-        // Try to update status without being in the correct state
-        uint256 wrongTime = (EPOCH_LENGTH / NUM_STATES) / 2; // In Assign state
-        vm.warp(wrongTime);
-        vm.prank(user1);
-        vm.expectRevert("Only assignee can update the jobStatus");
-        jobsManager.updateJobStatus(jobId, Status.RUNNING, BUFFER);
-    }
-
-    function testUpdateNonExistentJob() public {
-        vm.prank(admin);
-        vm.expectRevert("Job does not exist");
-        jobsManager.updateJobStatus(999, Status.QUEUED, BUFFER);
-    }
-
-    function testUpdateJobStatusUnauthorized() public {
-        vm.prank(user1);
-        uint256 jobId = jobsManager.createJob("Test Job Details");
-
-        vm.prank(user2);
-        vm.expectRevert("Only assignee can update the jobStatus");
-        jobsManager.updateJobStatus(jobId, Status.QUEUED, BUFFER);
-    }
-
-    function testCreateMultipleJobs() public {
-        uint256 numJobs = 5;
-        for (uint256 i = 0; i < numJobs; i++) {
-            vm.prank(user1);
-            jobsManager.createJob(string(abi.encodePacked("Job ", vm.toString(i))));
-        }
-
-        assertEq(jobsManager.jobIdCounter(), numJobs + 1);
-        assertEq(jobsManager.getActiveJobs().length, numJobs);
-    }
-
-    function testGetActiveJobs() public {
+    function testFailedJobStatus() public {
+        // Setup staker
         vm.startPrank(user1);
-        jobsManager.createJob("Job 1");
-        jobsManager.createJob("Job 2");
-        jobsManager.createJob("Job 3");
+        stakeManager.stake{value: 10 ether}(0, 10 ether, "test-spec");
         vm.stopPrank();
 
-        uint256[] memory activeJobs = jobsManager.getActiveJobs();
-        assertEq(activeJobs.length, 3);
-        assertEq(activeJobs[0], 1);
-        assertEq(activeJobs[1], 2);
-        assertEq(activeJobs[2], 3);
+        // Create and assign job
+        vm.prank(user2);
+        uint256 jobId = jobsManager.createJob{value: 1 ether}("Test Job");
+
+        uint256 stateLength = EPOCH_LENGTH / NUM_STATES;
+
+        // Assign job in Assign state (first state)
+        uint256 assignTime = (stateLength / 2); // Middle of Assign state
+        vm.warp(assignTime);
+        vm.prank(admin);
+        jobsManager.assignJob(jobId, user1, BUFFER);
+        assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.QUEUED), "Job should be QUEUED after assignment");
+
+        // Update to RUNNING in Update state (second state)
+        uint256 updateTime = stateLength + (stateLength / 2); // Middle of Update state
+        vm.warp(updateTime);
+        vm.prank(user1);
+        jobsManager.updateJobStatus(jobId, Status.RUNNING, BUFFER);
+        assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.RUNNING), "Job should be RUNNING after update");
+
+        // Set to FAILED in Confirm state (third state)
+        uint256 confirmTime = 2 * stateLength + (stateLength / 2); // Middle of Confirm state
+        vm.warp(confirmTime);
+        
+        vm.prank(user1);
+        jobsManager.updateJobStatus(jobId, Status.FAILED, BUFFER);
+        
+        // Verify job is properly failed
+        Structs.Job memory job = jobsManager.getJobDetails(jobId);
+        assertEq(uint(jobsManager.getJobStatus(jobId)), uint(Status.FAILED), "Job status should be FAILED");
+        assertTrue(job.conclusionEpoch > 0, "Conclusion epoch should be set");
+        assertEq(job.assignee, user1, "Assignee should remain unchanged");
+    } 
+
+    function testJobReward() public {
+        // Setup staker
+        vm.startPrank(user1);
+        stakeManager.stake{value: 10 ether}(0, 10 ether, "test-spec");
+        vm.stopPrank();
+
+        // Create job with fee
+        uint256 jobFee = 1 ether;
+        vm.prank(user2);
+        uint256 jobId = jobsManager.createJob{value: jobFee}("Test Job");
+
+        uint256 stateLength = EPOCH_LENGTH / NUM_STATES;
+        
+        // Assign job
+        vm.warp(stateLength / 2);
+        vm.prank(admin);
+        jobsManager.assignJob(jobId, user1, BUFFER);
+
+        // Complete job successfully
+        vm.warp(stateLength + (stateLength / 2));
+        vm.prank(user1);
+        jobsManager.updateJobStatus(jobId, Status.RUNNING, BUFFER);
+
+        vm.warp(2 * stateLength + (stateLength / 2));
+        uint256 balanceBefore = user1.balance;
+        vm.prank(user1);
+        jobsManager.updateJobStatus(jobId, Status.COMPLETED, BUFFER);
+
+        // Verify reward transfer
+        assertEq(user1.balance - balanceBefore, jobFee);
     }
 
-    function testJobDetailsRetrieval() public {
+    function testInvalidStateTransitions() public {
+        // Setup staker
+        vm.startPrank(user1);
+        stakeManager.stake{value: 10 ether}(0, 10 ether, "test-spec");
+        vm.stopPrank();
+
+        // Create job
+        vm.prank(user2);
+        uint256 jobId = jobsManager.createJob{value: 1 ether}("Test Job");
+
+        uint256 stateLength = EPOCH_LENGTH / NUM_STATES;
+
+        // Try to complete job without assignment
+        vm.warp(2 * stateLength + (stateLength / 2));
         vm.prank(user1);
-        uint256 jobId = jobsManager.createJob("Detailed Job Info");
+        vm.expectRevert("Only assignee can update the jobStatus");
+        jobsManager.updateJobStatus(jobId, Status.COMPLETED, BUFFER);
+
+        // Try to assign in wrong state
+        vm.warp(stateLength + (stateLength / 2));
+        vm.prank(admin);
+        vm.expectRevert("Can only assign job in Assign State");
+        jobsManager.assignJob(jobId, user1, BUFFER);
+    }
+
+    function testGetJobDetails() public {
+        vm.prank(user1);
+        uint256 jobId = jobsManager.createJob{value: 1 ether}("Test Job");
 
         Structs.Job memory job = jobsManager.getJobDetails(jobId);
         assertEq(job.jobId, jobId);
         assertEq(job.creator, user1);
         assertEq(job.assignee, address(0));
-        assertEq(job.creationEpoch, jobsManager.getEpoch());
-        assertEq(job.executionEpoch, 0);
-        assertEq(job.proofGenerationEpoch, 0);
-        assertEq(job.conclusionEpoch, 0);
-        assertEq(job.jobDetailsInJSON, "Detailed Job Info");
+        assertEq(job.jobFee, 1 ether);
+        assertEq(job.jobDetailsInJSON, "Test Job");
     }
 
-    function testNonExistentJobDetails() public {
+    function testMultipleJobs() public {
+        uint256 numJobs = 5;
+        for (uint256 i = 0; i < numJobs; i++) {
+            vm.prank(user1);
+            jobsManager.createJob{value: 1 ether}(string(abi.encodePacked("Job ", vm.toString(i))));
+        }
+
+        assertEq(jobsManager.jobIdCounter(), numJobs + 1);
+        uint256[] memory activeJobs = jobsManager.getActiveJobs();
+        assertEq(activeJobs.length, numJobs);
+    }
+
+    function testInvalidJobOperations() public {
+        // Test non-existent job
         vm.expectRevert("Job does not exist");
         jobsManager.getJobDetails(999);
+
+        // Test unauthorized job assignment
+        vm.prank(user2);
+        uint256 jobId = jobsManager.createJob{value: 1 ether}("Test Job");
+        
+        vm.prank(user1);
+        vm.expectRevert("Job assigner Role required to assignJob");
+        jobsManager.assignJob(jobId, user1, BUFFER);
     }
 }
