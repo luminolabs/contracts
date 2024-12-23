@@ -58,7 +58,6 @@ jobs:
 
       - name: Run coverage
         run: forge coverage --report lcov --report summary \
-          --report debug \
           --optimize \
           --optimizer-runs 200 \
           --no-auto-detect  
