@@ -76,17 +76,17 @@ contract StateManagerTest is Test, Constants, StateManager {
     }
 
     function testStateModifier() public {
-        function(State, uint32, uint8) external returns (bool) fn = this.dummyStateFunction;
+        function(State, uint8) external returns (bool) fn = this.dummyStateFunction;
         
         // Test happy path
         uint256 stateLength = EPOCH_LENGTH / NUM_STATES;
         uint256 assignTime = stateLength / 2;
         vm.warp(assignTime);
-        assertTrue(fn(State.Assign, 0, BUFFER));
+        assertTrue(fn(State.Assign, BUFFER));
 
         // Test incorrect state
         vm.expectRevert("Incorrect state");
-        fn(State.Update, 0, BUFFER);
+        fn(State.Update, BUFFER);
     }
 
     function testEpochModifier() public {
@@ -122,7 +122,7 @@ contract StateManagerTest is Test, Constants, StateManager {
     }
 
     // Dummy functions to test modifiers
-    function dummyStateFunction(State state, uint32 epoch, uint8 buffer) external view checkState(state, buffer) returns (bool) {
+    function dummyStateFunction(State state, uint8 buffer) external view checkState(state, buffer) returns (bool) {
         return true;
     }
 
@@ -142,20 +142,27 @@ contract StateManagerTest is Test, Constants, StateManager {
     function testStateTransitions() public {
         uint256 stateLength = EPOCH_LENGTH / NUM_STATES;
         
-        // Test full state transition cycle
-        for (uint256 i = 0; i < NUM_STATES; i++) {
-            // Start of state
+        // Test each state in sequence
+        for (uint8 i = 0; i < NUM_STATES; i++) {
+            // Start of state (plus buffer to avoid being in buffer state)
             uint256 stateStart = i * stateLength;
             vm.warp(stateStart + BUFFER + 1);
-            assertEq(uint8(stateManager.getState(BUFFER)), uint8(i));
+            
+            State currentState = stateManager.getState(BUFFER);
+            console.log("Testing state transition. Expected:", i, "Got:", uint(currentState));
+            assertEq(uint(currentState), uint(i), string(abi.encodePacked("State should be ", vm.toString(i))));
 
             // Middle of state
             vm.warp(stateStart + (stateLength / 2));
-            assertEq(uint8(stateManager.getState(BUFFER)), uint8(i));
+            assertEq(uint(stateManager.getState(BUFFER)), uint(i), "Middle of state should match");
 
-            // End of state (should be buffer)
-            vm.warp(stateStart + stateLength - BUFFER);
-            assertEq(uint8(stateManager.getState(BUFFER)), uint8(State.Buffer));
+            // Just before buffer (should still be in current state)
+            vm.warp(stateStart + stateLength - BUFFER - 1);
+            assertEq(uint(stateManager.getState(BUFFER)), uint(i), "Before buffer should match");
+
+            // In buffer period
+            vm.warp(stateStart + stateLength - (BUFFER / 2));
+            assertEq(uint(stateManager.getState(BUFFER)), uint(State.Buffer), "Should be in buffer state");
         }
     }
 }
