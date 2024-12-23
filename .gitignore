@@ -20,5 +20,6 @@ docs/
 slither-results.sarif
 
 node_modules
+lcov.info
 
 repomix-output.txt

@@ -57,21 +57,21 @@ jobs:
         id: test
 
       - name: Run coverage
-        run: |
-          forge coverage --report lcov --report summary \
+        run: forge coverage 
+          --report lcov --report summary \
             --report debug \
-            --use solc \
             --optimize \
             --optimizer-runs 200 \
-            --no-auto-detect
+            --no-auto-detect  
+        id: coverage
 
-      # - name: Upload coverage to Codecov
-      #   uses: codecov/codecov-action@v3
-      #   with:
-      #     token: ${{ secrets.CODECOV_TOKEN }}
-      #     files: ./lcov.info
-      #     fail_ci_if_error: true
-      #     verbose: true
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./lcov.info
+          fail_ci_if_error: true
+          verbose: true
 
   slither:
     name: Slither Analysis

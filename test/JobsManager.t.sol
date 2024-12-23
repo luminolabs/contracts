@@ -34,7 +34,7 @@ contract JobsManagerTest is Test, Constants {
         jobsManager.grantRole(jobsManager.DEFAULT_ADMIN_ROLE(), admin);
     }
 
-    function testInitialization() public {
+    function testInitialization() public view {
         assertEq(jobsManager.jobsPerStaker(), 5);
         assertTrue(jobsManager.hasRole(jobsManager.DEFAULT_ADMIN_ROLE(), admin));
         assertEq(jobsManager.jobIdCounter(), 1);
