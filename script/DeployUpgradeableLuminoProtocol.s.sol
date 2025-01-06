@@ -2,8 +2,8 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
-import "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "../lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
+import "@openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
 import "../src/Core/ACL.sol";
 import "../src/Core/StakeManager.sol";
 import "../src/Core/JobsManager.sol";
