@@ -60,4 +60,5 @@ contract Constants {
      * @notice Number of epochs for which stake is locked after calling unstake()
      */
     uint16 public unstakeLockPeriod = 1;
+
 }

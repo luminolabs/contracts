@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import "../../lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
-import "../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin-contracts/contracts/access/AccessControl.sol";
+import "@openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 
 /**
  * @title ACL (Access Control List)

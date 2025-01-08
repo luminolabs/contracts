@@ -14,7 +14,11 @@ docs/
 .env
 
 .vscode
-/lib/*
 .idea
 
-repopack-output.txt
+slither-results.sarif
+
+node_modules
+lcov.info
+
+repomix-output.txt

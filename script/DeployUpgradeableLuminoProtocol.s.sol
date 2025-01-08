@@ -2,8 +2,8 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
-import "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "../lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
+import "@openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
 import "../src/Core/ACL.sol";
 import "../src/Core/StakeManager.sol";
 import "../src/Core/JobsManager.sol";
@@ -100,8 +100,8 @@ contract DeployUpgradeableLuminoProtocol is Script {
         require(address(jobsManagerProxy) != address(0), "JobsManager Proxy address is zero");
         // require(address(blockManagerProxy) != address(0), "BlockManager Proxy address is zero");
 
-        StakeManager(address(stakeManagerProxy)).initialize();
-        JobsManager(address(jobsManagerProxy)).initialize(5);
+        StakeManager(address(stakeManagerProxy)).initialize(address(jobsManagerProxy));
+        JobsManager(address(jobsManagerProxy)).initialize(5, address(stakeManagerProxy));
         // BlockManager(address(blockManagerProxy)).initialize(
         //     address(stakeManagerProxy),
         //     address(jobsManagerProxy),
