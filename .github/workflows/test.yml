@@ -62,8 +62,12 @@ jobs:
           --report debug
           --optimize
           --optimizer-runs 200
+<<<<<<< HEAD
           --no-auto-detect
           --skip script/DeployUpgradableLuminoProtocol.s.sol 
+=======
+          --no-auto-detect  
+>>>>>>> dbdfca23eee90356ceca6988d8ed8bf75f7bf156
         id: coverage
 
       # - name: Upload coverage to Codecov

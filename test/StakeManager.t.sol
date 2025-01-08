@@ -23,13 +23,12 @@ contract StakeManagerTest is Test, Constants {
         staker1 = address(0x1);
         staker2 = address(0x2);
 
-        // Deploy contracts
-        stakeManager = new StakeManager();
+        // Deploy JobManager first
         jobsManager = new JobsManager();
-        
-        // Initialize contracts
+        jobsManager.initialize(5, address(0)); // Initialize with a dummy jobs manager address first
+
+        stakeManager = new StakeManager();
         stakeManager.initialize(address(jobsManager));
-        jobsManager.initialize(5, address(stakeManager));
 
         // Fund test accounts
         vm.deal(staker1, 100 ether);
@@ -37,6 +36,7 @@ contract StakeManagerTest is Test, Constants {
     }
 
     function testInitialization() public view {
+        assertEq(stakeManager.numStakers(), 0);
         assertTrue(stakeManager.hasRole(stakeManager.DEFAULT_ADMIN_ROLE(), admin));
         assertEq(stakeManager.numStakers(), 0);
     }
