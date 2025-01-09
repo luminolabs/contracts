@@ -7,6 +7,7 @@ import "@openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
 import "../src/Core/ACL.sol";
 import "../src/Core/StakeManager.sol";
 import "../src/Core/JobsManager.sol";
+import "../src/Core/Whitelist.sol";
 import "../src/Core/BlockManager.sol";
 
 /// @title DeployUpgradeableLuminoProtocol
@@ -27,12 +28,14 @@ contract DeployUpgradeableLuminoProtocol is Script {
     StakeManager public stakeManagerImpl;
     JobsManager public jobsManagerImpl;
     // BlockManager public blockManagerImpl;
+    Whitelist public whitelistImpl;
 
     /// @notice The proxy contract instances
     TransparentUpgradeableProxy public aclProxy;
     TransparentUpgradeableProxy public stakeManagerProxy;
     TransparentUpgradeableProxy public jobsManagerProxy;
     // TransparentUpgradeableProxy public blockManagerProxy;
+    TransparentUpgradeableProxy public whitelistProxy;
 
     /// @notice The main function to run the deployment script
     /// @dev This function deploys all contracts, initializes them, and logs their addresses
@@ -58,6 +61,7 @@ contract DeployUpgradeableLuminoProtocol is Script {
         stakeManagerImpl = new StakeManager();
         jobsManagerImpl = new JobsManager();
         // blockManagerImpl = new BlockManager();
+        whitelistImpl = new Whitelist();
 
         bytes memory emptyData = "";
         aclProxy = new TransparentUpgradeableProxy(
@@ -80,6 +84,11 @@ contract DeployUpgradeableLuminoProtocol is Script {
         //     address(proxyAdmin),
         //     emptyData
         // );
+        whitelistProxy = new TransparentUpgradeableProxy(
+            address(whitelistImpl),
+            address(proxyAdmin),
+            emptyData
+        );
     }
 
     /// @notice Initializes the ACL contract
@@ -126,5 +135,9 @@ contract DeployUpgradeableLuminoProtocol is Script {
         //     "BlockManager Proxy deployed at:",
         //     address(blockManagerProxy)
         // );
+        console.log(
+            "Whitelist Proxy deployed at:",
+            address(whitelistProxy)
+        );
     }
 }
