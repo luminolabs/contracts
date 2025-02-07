@@ -1,0 +1,73 @@
+sequenceDiagram
+    participant CP as Computing Provider
+    participant WM as WhitelistManager
+    participant SC as StakingCore
+    participant NR as NodeRegistryCore
+    participant NS as NodeStakingManager
+    participant EM as EpochManagerCore
+    participant LE as LeaderElectionManager
+    participant JR as JobRegistry
+    participant JA as JobAssignmentManager
+    participant JP as JobPaymentManager
+    participant PE as JobPaymentEscrow
+    participant RM as RewardManager
+    participant RV as RewardVault
+    participant PM as PenaltyManager
+
+%% CP Registration and Staking
+    CP->>WM: addCP()
+    WM-->>CP: CPAdded event
+    CP->>SC: stake(amount)
+    SC->>WM: isWhitelisted(cp)
+    WM-->>SC: true
+    SC-->>CP: Staked event
+
+%% Node Registration
+    CP->>NR: registerNode(computeRating)
+    NR->>WM: isWhitelisted(cp)
+    WM-->>NR: true
+    NR->>NS: validateStake(cp, computeRating)
+    NS->>SC: getStakedBalance(cp)
+    SC-->>NS: balance
+    NS-->>NR: true
+    NR-->>CP: NodeRegistered event
+
+%% Epoch and Leader Election
+    Note over EM: New epoch starts
+    EM-->>LE: getCurrentEpoch()
+    CP->>LE: submitCommitment(nodeId, commitment)
+    Note over EM: REVEAL phase
+    CP->>LE: revealSecret(nodeId, secret)
+    Note over EM: ELECT phase
+    LE->>EM: isInPhase(ELECT)
+    EM-->>LE: true
+    LE-->>CP: LeaderElected event
+
+%% Job Assignment
+    Note over EM: EXECUTE phase
+    LE->>JA: startAssignmentRound()
+    JA->>JR: getJobsByStatus(NEW)
+    JR-->>JA: newJobs[]
+    JA->>NR: getNodesInPool(poolId)
+    NR-->>JA: availableNodes[]
+    JA->>JR: assignNode(jobId, nodeId)
+    JR-->>CP: JobAssigned event
+
+%% Job Execution and Payment
+    CP->>JR: updateJobStatus(jobId, COMPLETE)
+    JR->>JP: processPayment(jobId)
+    JP->>PE: releaseJobPayment(node, amount, jobId)
+    PE-->>CP: JobPaymentReleased event
+
+%% Rewards Distribution
+    RM->>EM: getCurrentEpoch()
+    RM->>RV: distributeReward(cp, rewardType)
+    RV-->>CP: RewardDistributed event
+    CP->>RV: claimRewards()
+    RV-->>CP: RewardsClaimed event
+
+%% Penalties (if applicable)
+    PM->>SC: getStakedBalance(cp)
+    SC-->>PM: balance
+    PM->>SC: applyPenalty(cp, reason)
+    PM-->>CP: PenaltyApplied event

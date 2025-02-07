@@ -3,18 +3,4 @@ src = "src"
 out = "out"
 libs = ["lib"]
 
-[profile.default.fuzz]
-runs = 1000
-
-[profile.ci]
-fuzz_runs = 10000
-verbosity = 4
-
-[profile.gas]
-gas_reports = ["*"]
-
-
-[etherscan]
-holesky = { key = "<your-etherscan-api-key>", url = "https://api-holesky.etherscan.io/api" }
-
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
