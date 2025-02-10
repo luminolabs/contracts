@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
-import "./interfaces/IStakingCore.sol";
-import "./interfaces/IWhitelistManager.sol";
-import "./interfaces/IAccessController.sol";
+import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {ReentrancyGuard} from "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
+import {WhitelistControlled} from "./abstracts/WhitelistControlled.sol";
+import {IStakingCore} from "./interfaces/IStakingCore.sol";
 
 /**
  * @title StakingCore
@@ -19,14 +19,10 @@ import "./interfaces/IAccessController.sol";
  * - Requires whitelist verification before staking
  * - Implements a time lock for unstaking to prevent rapid stake/unstake cycles
  * - Only authorized contracts can apply penalties
- *
- * @custom:security-contact security@luminonetwork.com
  */
-contract StakingCore is IStakingCore, ReentrancyGuard {
+contract StakingCore is IStakingCore, AccessControlled, WhitelistControlled, ReentrancyGuard {
     // Core contracts
     IERC20 public immutable stakingToken;
-    IWhitelistManager public immutable whitelistManager;
-    IAccessController public immutable accessController;
 
     /**
      * @notice Duration that stakes must be locked before withdrawal
@@ -40,13 +36,23 @@ contract StakingCore is IStakingCore, ReentrancyGuard {
      */
     uint256 public constant MIN_STAKE = 100 ether; // 100 tokens minimum
 
-    // Staking state
+    /**
+     * @dev Struct to track unstake requests
+     * @param amount Amount of tokens requested to unstake
+     * @param timestamp Time when the unstake request was made
+     */
+    struct UnstakeRequest {
+        uint256 amount;
+        uint256 timestamp;
+    }
+
+    // State variables
+    /// @dev Tracks the current stake balance of each computing provider
     mapping(address => uint256) private stakes;
+    /// @dev Tracks active unstake requests for each provider
     mapping(address => UnstakeRequest) private unstakeRequests;
 
     // Custom errors
-    error Unauthorized(address caller);
-    error NotWhitelisted(address cp);
     error BelowMinimumStake(uint256 provided, uint256 minimum);
     error InsufficientStake(address cp, uint256 requested, uint256 available);
     error ExistingUnstakeRequest(address cp);
@@ -60,26 +66,6 @@ contract StakingCore is IStakingCore, ReentrancyGuard {
     event UnstakeRequestCancelled(address indexed cp, uint256 amount);
 
     /**
-     * @dev Ensures caller is an authorized contract
-     */
-    modifier onlyContracts() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("CONTRACTS_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /**
-     * @dev Ensures caller has admin role
-     */
-    modifier onlyAdmin() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("ADMIN_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /**
      * @notice Initialize the staking contract
      * @dev Sets up core contract references and validates addresses
      * @param _stakingToken Address of the ERC20 token used for staking
@@ -90,13 +76,14 @@ contract StakingCore is IStakingCore, ReentrancyGuard {
         address _stakingToken,
         address _whitelistManager,
         address _accessController
-    ) {
+    )
+    AccessControlled(_accessController)
+    WhitelistControlled(_whitelistManager)
+    {
         if (_stakingToken == address(0) || _whitelistManager == address(0) ||
             _accessController == address(0)) revert ZeroAddress();
 
         stakingToken = IERC20(_stakingToken);
-        whitelistManager = IWhitelistManager(_whitelistManager);
-        accessController = IAccessController(_accessController);
     }
 
     /**
@@ -105,10 +92,7 @@ contract StakingCore is IStakingCore, ReentrancyGuard {
      * Tokens are transferred from the provider to this contract
      * @param amount The amount of tokens to stake
      */
-    function stake(uint256 amount) external nonReentrant {
-        if (!whitelistManager.isWhitelisted(msg.sender)) {
-            revert NotWhitelisted(msg.sender);
-        }
+    function stake(uint256 amount) external isWhitelisted nonReentrant {
         if (amount < MIN_STAKE) {
             revert BelowMinimumStake(amount, MIN_STAKE);
         }

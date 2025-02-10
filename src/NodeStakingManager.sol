@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "./interfaces/INodeStakingManager.sol";
-import "./interfaces/IStakingCore.sol";
-import "./interfaces/INodeRegistryCore.sol";
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
+import {INodeRegistryCore} from "./interfaces/INodeRegistryCore.sol";
+import {INodeStakingManager} from "./interfaces/INodeStakingManager.sol";
+import {IStakingCore} from "./interfaces/IStakingCore.sol";
 
 /**
  * @title NodeStakingManager
@@ -11,11 +12,9 @@ import "./interfaces/INodeRegistryCore.sol";
  * This contract validates stake amounts based on node compute ratings and manages
  * per-Computing Provider (CP) stake requirements.
  */
-contract NodeStakingManager is INodeStakingManager {
-    /// @notice Interface for interacting with the main staking contract
+contract NodeStakingManager is INodeStakingManager, AccessControlled {
+    // Core contracts
     IStakingCore public immutable stakingContract;
-
-    /// @notice Interface for interacting with the node registry
     INodeRegistryCore public immutable nodeRegistry;
 
     /**
@@ -35,17 +34,13 @@ contract NodeStakingManager is INodeStakingManager {
      * @param _stakingContract Address of the StakingCore contract
      * @param _nodeRegistry Address of the NodeRegistryCore contract
      */
-    constructor(address _stakingContract, address _nodeRegistry) {
+    constructor(
+        address _stakingContract,
+        address _nodeRegistry,
+        address _accessController
+    ) AccessControlled(_accessController) {
         stakingContract = IStakingCore(_stakingContract);
         nodeRegistry = INodeRegistryCore(_nodeRegistry);
-    }
-
-    /**
-     * @notice Ensures only the NodeRegistry contract can call certain functions
-     */
-    modifier onlyNodeRegistry() {
-        require(msg.sender == address(nodeRegistry), "NodeStakingManager: Only NodeRegistry");
-        _;
     }
 
     /**
@@ -65,7 +60,7 @@ contract NodeStakingManager is INodeStakingManager {
      * @param computeRating Compute rating to validate stake against
      * @return bool True if CP has sufficient stake, false otherwise
      */
-    function validateStake(address cp, uint256 computeRating) external view returns (bool) {
+    function validateStake(address cp, uint256 computeRating) external returns (bool) {
         uint256 currentRequirement = cpStakeRequirements[cp];
         uint256 newRequirement = calculateRequiredStake(computeRating);
         uint256 totalRequired = currentRequirement + newRequirement;
@@ -82,7 +77,7 @@ contract NodeStakingManager is INodeStakingManager {
      * @param cp Address of the Computing Provider
      * @param newRequirement New total stake requirement
      */
-    function updateStakeRequirement(address cp, uint256 newRequirement) external onlyNodeRegistry {
+    function updateStakeRequirement(address cp, uint256 newRequirement) external onlyContracts {
         cpStakeRequirements[cp] = newRequirement;
         emit StakeRequirementUpdated(cp, newRequirement);
     }

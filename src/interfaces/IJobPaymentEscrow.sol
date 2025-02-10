@@ -35,8 +35,6 @@ interface IJobPaymentEscrow {
     );
 
     // Admin functions
-    function pause() external;
-    function unpause() external;
     function emergencyWithdraw() external;
 
     // Constants

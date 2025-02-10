@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "./interfaces/ILeaderElectionManager.sol";
-import "./interfaces/IEpochManagerCore.sol";
-import "./interfaces/INodeRegistryCore.sol";
-import "./interfaces/IStakingCore.sol";
-import "./interfaces/IAccessController.sol";
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
+import {IAccessController} from "./interfaces/IAccessController.sol";
+import {IEpochManager} from "./interfaces/IEpochManager.sol";
+import {ILeaderElectionManager} from "./interfaces/ILeaderElectionManager.sol";
+import {INodeRegistryCore} from "./interfaces/INodeRegistryCore.sol";
+import {IStakingCore} from "./interfaces/IStakingCore.sol";
+import {Epoch} from "./libraries/Epoch.sol";
+import {Nodes} from "./libraries/Nodes.sol";
 
 /**
  * @title LeaderElectionManager
@@ -23,60 +26,30 @@ import "./interfaces/IAccessController.sol";
  * - Phase-specific actions are enforced through epoch manager
  * - Strict verification of revealed secrets against commitments
  */
-contract LeaderElectionManager is ILeaderElectionManager {
+contract LeaderElectionManager is ILeaderElectionManager, AccessControlled {
     // Core contracts
-    IEpochManagerCore public immutable epochManager;
+    IEpochManager public immutable epochManager;
     INodeRegistryCore public immutable nodeRegistry;
     IStakingCore public immutable stakingCore;
-    IAccessController public immutable accessController;
 
     // Election state
+    /// @dev Mapping of node commitments for each epoch
     mapping(uint256 => mapping(uint256 => bytes32)) private nodeCommitments;
+    /// @dev Mapping of node reveals for each epoch
     mapping(uint256 => mapping(uint256 => bytes)) private nodeReveals;
+    /// @dev List of nodes that revealed their secrets for each epoch
     mapping(uint256 => uint256[]) private nodeRevealsList;
+    /// @dev Mapping of final random values for each epoch
     mapping(uint256 => bytes32) private finalRandomValues;
+    /// @dev Mapping of elected leaders for each epoch
     mapping(uint256 => uint256) private epochLeaders;
 
     // Custom errors
-    error NotNodeOwner(address caller, uint256 nodeId);
-    error WrongPhase(IEpochManagerCore.EpochState required);
+    error WrongPhase(Epoch.State required);
     error NoCommitmentFound(uint256 epoch, uint256 nodeId);
     error InvalidSecret(uint256 nodeId);
     error NoRevealsSubmitted(uint256 epoch);
     error MissingReveal(uint256 nodeId);
-    error Unauthorized(address caller);
-
-    /**
-     * @dev Ensures caller is the owner of the specified node
-     * @param nodeId The ID of the node
-     */
-    modifier onlyNodeOwner(uint256 nodeId) {
-        if (nodeRegistry.getNodeOwner(nodeId) != msg.sender) {
-            revert NotNodeOwner(msg.sender, nodeId);
-        }
-        _;
-    }
-
-    /**
-     * @dev Ensures the current epoch is in the specified phase
-     * @param requiredPhase The phase that the operation requires
-     */
-    modifier onlyDuringPhase(IEpochManagerCore.EpochState requiredPhase) {
-        if (!epochManager.isInPhase(requiredPhase)) {
-            revert WrongPhase(requiredPhase);
-        }
-        _;
-    }
-
-    /**
-     * @dev Ensures caller has operator role
-     */
-    modifier onlyOperator() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("OPERATOR_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
 
     /**
      * @dev Initializes the contract with required dependencies
@@ -90,11 +63,10 @@ contract LeaderElectionManager is ILeaderElectionManager {
         address _nodeRegistry,
         address _stakingCore,
         address _accessController
-    ) {
-        epochManager = IEpochManagerCore(_epochManager);
+    ) AccessControlled(_accessController) {
+        epochManager = IEpochManager(_epochManager);
         nodeRegistry = INodeRegistryCore(_nodeRegistry);
         stakingCore = IStakingCore(_stakingCore);
-        accessController = IAccessController(_accessController);
     }
 
     /**
@@ -110,9 +82,9 @@ contract LeaderElectionManager is ILeaderElectionManager {
      */
     function submitCommitment(uint256 nodeId, bytes32 commitment)
     external
-    onlyNodeOwner(nodeId)
-    onlyDuringPhase(IEpochManagerCore.EpochState.COMMIT)
     {
+        Nodes.validateNodeOwner(nodeRegistry, nodeId, msg.sender);
+        Epoch.validateState(Epoch.State.COMMIT, epochManager);
         uint256 currentEpoch = epochManager.getCurrentEpoch();
         nodeCommitments[currentEpoch][nodeId] = commitment;
 
@@ -134,9 +106,9 @@ contract LeaderElectionManager is ILeaderElectionManager {
      */
     function revealSecret(uint256 nodeId, bytes calldata secret)
     external
-    onlyNodeOwner(nodeId)
-    onlyDuringPhase(IEpochManagerCore.EpochState.REVEAL)
     {
+        Nodes.validateNodeOwner(nodeRegistry, nodeId, msg.sender);
+        Epoch.validateState(Epoch.State.REVEAL, epochManager);
         uint256 currentEpoch = epochManager.getCurrentEpoch();
         bytes32 committed = nodeCommitments[currentEpoch][nodeId];
 
@@ -169,9 +141,9 @@ contract LeaderElectionManager is ILeaderElectionManager {
      */
     function electLeader()
     external
-    onlyDuringPhase(IEpochManagerCore.EpochState.ELECT)
     returns (uint256 leaderNodeId)
     {
+        Epoch.validateState(Epoch.State.ELECT, epochManager);
         uint256 currentEpoch = epochManager.getCurrentEpoch();
         uint256[] memory nodeIds = nodeRevealsList[currentEpoch];
 

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
-import "./interfaces/IPenaltyManager.sol";
-import "./interfaces/IStakingCore.sol";
-import "./interfaces/IAccessController.sol";
+import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {ReentrancyGuard} from "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
+import {IAccessController} from "./interfaces/IAccessController.sol";
+import {IPenaltyManager} from "./interfaces/IPenaltyManager.sol";
+import {IStakingCore} from "./interfaces/IStakingCore.sol";
 
 /**
  * @title PenaltyManager
@@ -18,40 +19,21 @@ import "./interfaces/IAccessController.sol";
  * - Repeated penalties can trigger complete slashing of remaining stake
  * - All penalized tokens are sent to a treasury address
  */
-contract PenaltyManager is IPenaltyManager, ReentrancyGuard {
+contract PenaltyManager is IPenaltyManager, AccessControlled, ReentrancyGuard {
     // Core contracts
     IStakingCore public immutable stakingCore;
     IERC20 public immutable stakingToken;
-    IAccessController public immutable accessController;
 
-    /**
-     * @notice Percentage of staked tokens taken as penalty (1-100)
-     * @dev Used to calculate penalty amounts based on staked balance
-     */
+    // Penalty configuration
     uint256 public penaltyRate;
-
-    /**
-     * @notice Number of penalties before slashing is triggered
-     * @dev Once a CP reaches this threshold, their entire stake can be slashed
-     */
     uint256 public slashThreshold;
 
-    /**
-     * @notice Tracks number of penalties per computing provider
-     * @dev Incremented each time a penalty is applied
-     */
+    // State variables
+    /// @dev Tracks number of penalties applied to each computing provider
     mapping(address => uint256) private penaltyCount;
-
-    /**
-     * @notice Tracks total amount of penalties per computing provider
-     * @dev Cumulative sum of all penalties applied
-     */
+    /// @dev Tracks total amount of penalties applied to each computing provider
     mapping(address => uint256) private totalPenaltyAmount;
-
-    /**
-     * @notice Tracks if a computing provider has been slashed
-     * @dev Once slashed, no further penalties can be applied
-     */
+    /// @dev Tracks whether a computing provider has been slashed
     mapping(address => bool) private slashed;
 
     /**
@@ -61,7 +43,6 @@ contract PenaltyManager is IPenaltyManager, ReentrancyGuard {
     address public treasury;
 
     // Custom errors
-    error Unauthorized(address caller);
     error AlreadySlashed(address cp);
     error NoStakeToSlash(address cp);
     error InvalidPenaltyConfig(uint256 value);
@@ -73,37 +54,6 @@ contract PenaltyManager is IPenaltyManager, ReentrancyGuard {
     // Events
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event EmergencyTransfer(address indexed token, address indexed recipient, uint256 amount);
-
-    /**
-     * @notice Restricts access to operators
-     */
-    modifier onlyOperator() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("OPERATOR_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /**
-     * @notice Restricts access to admins
-     */
-    modifier onlyAdmin() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("ADMIN_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /**
-     * @notice Restricts access to operators or authorized contracts
-     */
-    modifier onlyOperatorOrContracts() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("OPERATOR_ROLE")) &&
-        !accessController.isAuthorized(msg.sender, keccak256("CONTRACTS_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
 
     /**
      * @notice Initialize the PenaltyManager contract
@@ -121,13 +71,12 @@ contract PenaltyManager is IPenaltyManager, ReentrancyGuard {
         address _accessController,
         uint256 _initialPenaltyRate,
         uint256 _initialSlashThreshold
-    ) {
+    ) AccessControlled(_accessController) {
         if (_treasury == address(0)) revert ZeroAddress();
 
         stakingCore = IStakingCore(_stakingCore);
         stakingToken = IERC20(_stakingToken);
         treasury = _treasury;
-        accessController = IAccessController(_accessController);
 
         if (_initialPenaltyRate == 0 || _initialPenaltyRate > 100) {
             revert InvalidPenaltyConfig(_initialPenaltyRate);
@@ -185,6 +134,8 @@ contract PenaltyManager is IPenaltyManager, ReentrancyGuard {
      * @param cp Address of computing provider to slash
      */
     function executeSlash(address cp) public nonReentrant {
+        // TODO: Only in dispute state
+
         if (slashed[cp]) {
             revert AlreadySlashed(cp);
         }

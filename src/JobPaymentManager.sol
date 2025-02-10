@@ -1,30 +1,32 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "./interfaces/IJobPaymentManager.sol";
-import "./interfaces/IJobRegistry.sol";
-import "./interfaces/INodeRegistryCore.sol";
-import "./interfaces/IJobPaymentEscrow.sol";
-import "./interfaces/IAccessController.sol";
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
+import {IAccessController} from "./interfaces/IAccessController.sol";
+import {IJobPaymentEscrow} from "./interfaces/IJobPaymentEscrow.sol";
+import {IJobPaymentManager} from "./interfaces/IJobPaymentManager.sol";
+import {IJobRegistry} from "./interfaces/IJobRegistry.sol";
+import {INodeRegistryCore} from "./interfaces/INodeRegistryCore.sol";
 
 /**
  * @title JobPaymentManager
  * @notice Manages job payments and fee calculations for completed jobs
  * @dev Handles the processing, calculation, and distribution of payments for completed jobs
  */
-contract JobPaymentManager is IJobPaymentManager {
+contract JobPaymentManager is IJobPaymentManager, AccessControlled {
     // Core contracts
     IJobRegistry public immutable jobRegistry;
     INodeRegistryCore public immutable nodeRegistry;
     IJobPaymentEscrow public immutable paymentEscrow;
-    IAccessController public immutable accessController;
 
     // Payment configuration
     uint256 public baseFee;
     uint256 public ratingMultiplier;
 
-    // Payment tracking
+    // State variables
+    /// @dev Mapping of processed jobs to prevent double payments
     mapping(uint256 => bool) private processedJobs;
+    /// @dev Mapping of last withdrawal timestamp for cooldown period
     mapping(address => uint256) private lastWithdrawal;
 
     // Constants
@@ -37,50 +39,7 @@ contract JobPaymentManager is IJobPaymentManager {
     error WithdrawalCooldownActive(uint256 remainingTime);
     error InsufficientWithdrawalAmount(uint256 amount, uint256 minimum);
     error TransferFailed();
-    error Unauthorized(address caller);
     error InvalidFeeUpdate(uint256 newBaseFee, uint256 newRatingMultiplier);
-
-    // Modifiers
-    /**
-     * @notice Restricts function access to operators only
-     */
-    modifier onlyOperator() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("OPERATOR_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /**
-     * @notice Restricts function access to admin only
-     */
-    modifier onlyAdmin() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("ADMIN_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /**
-     * @notice Restricts function access to authorized contracts only
-     */
-    modifier onlyContracts() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("CONTRACTS_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /**
-     * @notice Restricts function access to operators or authorized contracts
-     */
-    modifier onlyOperatorOrContracts() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("OPERATOR_ROLE")) &&
-        !accessController.isAuthorized(msg.sender, keccak256("CONTRACTS_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
 
     /**
      * @notice Ensures a job hasn't been processed already
@@ -110,11 +69,10 @@ contract JobPaymentManager is IJobPaymentManager {
         address _accessController,
         uint256 _baseFee,
         uint256 _ratingMultiplier
-    ) {
+    ) AccessControlled(_accessController) {
         jobRegistry = IJobRegistry(_jobRegistry);
         nodeRegistry = INodeRegistryCore(_nodeRegistry);
         paymentEscrow = IJobPaymentEscrow(_paymentEscrow);
-        accessController = IAccessController(_accessController);
         baseFee = _baseFee;
         ratingMultiplier = _ratingMultiplier;
     }

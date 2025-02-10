@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "./interfaces/INodeRegistryCore.sol";
-import "./interfaces/INodeStakingManager.sol";
-import "./interfaces/IWhitelistManager.sol";
-import "./interfaces/IAccessController.sol";
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
+import {WhitelistControlled} from "./abstracts/WhitelistControlled.sol";
+import {INodeRegistryCore} from "./interfaces/INodeRegistryCore.sol";
+import {INodeStakingManager} from "./interfaces/INodeStakingManager.sol";
+import {Nodes} from "./libraries/Nodes.sol";
 
 /**
  * @title NodeRegistryCore
@@ -19,14 +20,9 @@ import "./interfaces/IAccessController.sol";
  * - Node activity status tracking
  * - Ownership verification for node operations
  */
-contract NodeRegistryCore is INodeRegistryCore {
-    // Core contracts used for validation and management
-    /// @notice Contract handling node staking requirements and validation
+contract NodeRegistryCore is INodeRegistryCore, AccessControlled, WhitelistControlled {
+    // Core contracts
     INodeStakingManager public immutable stakingManager;
-    /// @notice Contract managing computing provider whitelist status
-    IWhitelistManager public immutable whitelistManager;
-    /// @notice Contract handling access control and permissions
-    IAccessController public immutable accessController;
 
     // State variables
     /// @notice Counter for generating unique node IDs
@@ -39,29 +35,9 @@ contract NodeRegistryCore is INodeRegistryCore {
     mapping(uint256 => uint256[]) private poolNodes;
 
     // Custom errors
-    /// @notice Error when caller is not the node owner
-    error NotNodeOwner(address caller, uint256 nodeId);
-    /// @notice Error when node ID does not exist
     error NodeNotFound(uint256 nodeId);
-    /// @notice Error when attempting operation on inactive node
     error NodeNotActive(uint256 nodeId);
-    /// @notice Error when CP is not whitelisted
-    error NotWhitelisted(address cp);
-    /// @notice Error when CP has insufficient stake for compute rating
     error InsufficientStake(address cp, uint256 computeRating);
-    /// @notice Error when caller lacks required permissions
-    error Unauthorized(address caller);
-
-    /**
-     * @dev Modifier to restrict access to node owners
-     * @param nodeId ID of the node being accessed
-     */
-    modifier onlyNodeOwner(uint256 nodeId) {
-        if (nodes[nodeId].cp != msg.sender) {
-            revert NotNodeOwner(msg.sender, nodeId);
-        }
-        _;
-    }
 
     /**
      * @dev Modifier to verify node exists
@@ -84,10 +60,11 @@ contract NodeRegistryCore is INodeRegistryCore {
         address _stakingManager,
         address _whitelistManager,
         address _accessController
-    ) {
+    )
+    AccessControlled(_accessController)
+    WhitelistControlled(_whitelistManager)
+    {
         stakingManager = INodeStakingManager(_stakingManager);
-        whitelistManager = IWhitelistManager(_whitelistManager);
-        accessController = IAccessController(_accessController);
     }
 
     /**
@@ -101,13 +78,12 @@ contract NodeRegistryCore is INodeRegistryCore {
      *
      * Emits a {NodeRegistered} event
      */
-    function registerNode(uint256 computeRating) external returns (uint256) {
-        if (!whitelistManager.isWhitelisted(msg.sender)) {
-            revert NotWhitelisted(msg.sender);
-        }
+    function registerNode(uint256 computeRating) external isWhitelisted returns (uint256) {
         if (!stakingManager.validateStake(msg.sender, computeRating)) {
             revert InsufficientStake(msg.sender, computeRating);
         }
+
+        // TODO: Update stake requirement for CP in staking manager
 
         nodeCounter++;
         nodes[nodeCounter] = NodeInfo({
@@ -137,11 +113,13 @@ contract NodeRegistryCore is INodeRegistryCore {
     function unregisterNode(uint256 nodeId)
     external
     nodeExists(nodeId)
-    onlyNodeOwner(nodeId)
     {
+        Nodes.validateNodeOwner(this, nodeId, msg.sender);
         if (!nodes[nodeId].active) {
             revert NodeNotActive(nodeId);
         }
+
+        // TODO: Update stake requirement for CP in staking manager
 
         nodes[nodeId].active = false;
 
@@ -173,13 +151,16 @@ contract NodeRegistryCore is INodeRegistryCore {
     function updateNodeRating(
         uint256 nodeId,
         uint256 newComputeRating
-    ) external nodeExists(nodeId) onlyNodeOwner(nodeId) {
+    ) external nodeExists(nodeId) {
+        Nodes.validateNodeOwner(this, nodeId, msg.sender);
         if (!nodes[nodeId].active) {
             revert NodeNotActive(nodeId);
         }
         if (!stakingManager.validateStake(msg.sender, newComputeRating)) {
             revert InsufficientStake(msg.sender, newComputeRating);
         }
+
+        // TODO: Update stake requirement for CP in staking manager
 
         // Remove from old pool
         uint256 oldRating = nodes[nodeId].computeRating;

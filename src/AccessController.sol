@@ -1,49 +1,31 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "./interfaces/IAccessController.sol";
-import "./interfaces/IRoleManager.sol";
-import "./interfaces/IWhitelistManager.sol";
+import {IAccessController} from "./interfaces/IAccessController.sol";
+import {IRoleManager} from "./interfaces/IRoleManager.sol";
+import {Roles} from "./libraries/Roles.sol";
 
 /**
  * @title AccessController
  * @notice Manages access control and authorization across the system
  * @dev This contract serves as the central access control mechanism, working in conjunction
- * with RoleManager and WhitelistManager to enforce permissions throughout the protocol
+ * with RoleManager to enforce permissions throughout the protocol
  */
 contract AccessController is IAccessController {
-    /// @notice Reference to the role management contract
+    // Core contracts
     IRoleManager public immutable roleManager;
 
-    /// @notice Reference to the whitelist management contract
-    IWhitelistManager public immutable whitelistManager;
-
-    /// @notice Core system role for administrative access
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-
-    /// @notice Core system role for operator access
-    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
-
-    /// @notice Core system role for contract-to-contract access
-    bytes32 public constant CONTRACTS_ROLE = keccak256("CONTRACTS_ROLE");
-
-    /// @notice Thrown when an account attempts an action without proper authorization
+    // Custom errors
     error UnauthorizedAccess(address account, bytes32 role);
-
-    /// @notice Thrown when an account lacks necessary permissions
     error AccountNotAuthorized(address account);
-
-    /// @notice Thrown when an account is missing a required role
     error MissingRequiredRole(address account, bytes32 role);
 
     /**
      * @notice Initializes the AccessController with required dependencies
      * @param _roleManager Address of the RoleManager contract
-     * @param _whitelistManager Address of the WhitelistManager contract
      */
-    constructor(address _roleManager, address _whitelistManager) {
+    constructor(address _roleManager) {
         roleManager = IRoleManager(_roleManager);
-        whitelistManager = IWhitelistManager(_whitelistManager);
     }
 
     /**
@@ -58,7 +40,7 @@ contract AccessController is IAccessController {
         bytes32 role
     ) public view override returns (bool) {
         // Admin role has access to everything
-        if (roleManager.hasRole(ADMIN_ROLE, account)) {
+        if (roleManager.hasRole(Roles.ADMIN_ROLE, account)) {
             return true;
         }
 
@@ -95,9 +77,9 @@ contract AccessController is IAccessController {
      * @return bool True if account has any role
      */
     function hasAnyRole(address account) external view returns (bool) {
-        return roleManager.hasRole(ADMIN_ROLE, account) ||
-        roleManager.hasRole(OPERATOR_ROLE, account) ||
-            roleManager.hasRole(CONTRACTS_ROLE, account);
+        return roleManager.hasRole(Roles.ADMIN_ROLE, account) ||
+        roleManager.hasRole(Roles.OPERATOR_ROLE, account) ||
+            roleManager.hasRole(Roles.CONTRACTS_ROLE, account);
     }
 
     /**
@@ -106,8 +88,8 @@ contract AccessController is IAccessController {
      * @param contractAddress Address of contract to verify
      */
     function requireContractRole(address contractAddress) external view {
-        if (!roleManager.hasRole(CONTRACTS_ROLE, contractAddress)) {
-            revert UnauthorizedAccess(contractAddress, CONTRACTS_ROLE);
+        if (!roleManager.hasRole(Roles.CONTRACTS_ROLE, contractAddress)) {
+            revert UnauthorizedAccess(contractAddress, Roles.CONTRACTS_ROLE);
         }
     }
 }

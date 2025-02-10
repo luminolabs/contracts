@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "./interfaces/IJobAssignmentManager.sol";
-import "./interfaces/IJobRegistry.sol";
-import "./interfaces/INodeRegistryCore.sol";
-import "./interfaces/ILeaderElectionManager.sol";
-import "./interfaces/IEpochManagerCore.sol";
+import {IEpochManager} from "./interfaces/IEpochManager.sol";
+import {IJobAssignmentManager} from "./interfaces/IJobAssignmentManager.sol";
+import {IJobRegistry} from "./interfaces/IJobRegistry.sol";
+import {ILeaderElectionManager} from "./interfaces/ILeaderElectionManager.sol";
+import {INodeRegistryCore} from "./interfaces/INodeRegistryCore.sol";
+import {Epoch} from "./libraries/Epoch.sol";
 
 /**
  * @title JobAssignmentManager
@@ -24,7 +25,7 @@ contract JobAssignmentManager is IJobAssignmentManager {
     IJobRegistry public immutable jobRegistry;
     INodeRegistryCore public immutable nodeRegistry;
     ILeaderElectionManager public immutable leaderManager;
-    IEpochManagerCore public immutable epochManager;
+    IEpochManager public immutable epochManager;
 
     // Track assignments and constraints
     mapping(uint256 => uint256[]) private nodeAssignments; // nodeId => jobIds
@@ -35,22 +36,11 @@ contract JobAssignmentManager is IJobAssignmentManager {
     uint256 public assignmentTimeout;
 
     /**
-     * @dev Ensures only the current leader can call a function
-     */
-    modifier onlyLeader() {
-        require(
-            nodeRegistry.getNodeOwner(leaderManager.getCurrentLeader()) == msg.sender,
-            "JobAssignmentManager: Not current leader"
-        );
-        _;
-    }
-
-    /**
      * @dev Constructor initializes core contract references and assignment parameters
      * @param _jobRegistry Address of the JobRegistry contract
      * @param _nodeRegistry Address of the NodeRegistryCore contract
      * @param _leaderManager Address of the LeaderElectionManager contract
-     * @param _epochManager Address of the EpochManagerCore contract
+     * @param _epochManager Address of the EpochManager contract
      * @param _assignmentTimeout Duration before an unconfirmed assignment expires
      */
     constructor(
@@ -63,7 +53,7 @@ contract JobAssignmentManager is IJobAssignmentManager {
         jobRegistry = IJobRegistry(_jobRegistry);
         nodeRegistry = INodeRegistryCore(_nodeRegistry);
         leaderManager = ILeaderElectionManager(_leaderManager);
-        epochManager = IEpochManagerCore(_epochManager);
+        epochManager = IEpochManager(_epochManager);
         maxJobsPerNode = 1;
         assignmentTimeout = _assignmentTimeout;
     }
@@ -75,11 +65,9 @@ contract JobAssignmentManager is IJobAssignmentManager {
      * Assigns jobs based on node capacity and pool requirements
      * Emits JobAssigned events for each successful assignment
      */
-    function startAssignmentRound() external onlyLeader {
-        require(
-            epochManager.isInPhase(IEpochManagerCore.EpochState.EXECUTE),
-            "JobAssignmentManager: Not in execute phase"
-        );
+    function startAssignmentRound() external {
+        Epoch.validateState(Epoch.State.EXECUTE, epochManager);
+        validateLeader();
 
         uint256[] memory newJobs = jobRegistry.getJobsByStatus(IJobRegistry.JobStatus.NEW);
         bytes32 randomSeed = leaderManager.getFinalRandomValue(epochManager.getCurrentEpoch());
@@ -115,16 +103,14 @@ contract JobAssignmentManager is IJobAssignmentManager {
      * @dev Allows a node to confirm acceptance of an assigned job
      * @param jobId Identifier of the job to confirm
      * @notice Can only be called by the owner of the assigned node
-     * Updates job status to CONFIRMED in the job registry
      * @notice Must be called within assignment timeout period
+     * Updates job status to CONFIRMED in the job registry
      */
     function confirmJob(uint256 jobId) external {
         IJobRegistry.Job memory job = jobRegistry.getJob(jobId);
         require(job.status == IJobRegistry.JobStatus.ASSIGNED, "JobAssignmentManager: Job not assigned");
-        require(
-            nodeRegistry.getNodeOwner(job.assignedNode) == msg.sender,
-            "JobAssignmentManager: Not assigned node owner"
-        );
+        validateNodeOwner(job);
+        Epoch.validateState(Epoch.State.CONFIRM, epochManager);
 
         jobRegistry.updateJobStatus(jobId, IJobRegistry.JobStatus.CONFIRMED);
         emit JobConfirmed(jobId, job.assignedNode);
@@ -139,10 +125,8 @@ contract JobAssignmentManager is IJobAssignmentManager {
     function completeJob(uint256 jobId) external {
         IJobRegistry.Job memory job = jobRegistry.getJob(jobId);
         require(job.status == IJobRegistry.JobStatus.CONFIRMED, "JobAssignmentManager: Job not confirmed");
-        require(
-            nodeRegistry.getNodeOwner(job.assignedNode) == msg.sender,
-            "JobAssignmentManager: Not assigned node owner"
-        );
+        validateNodeOwner(job);
+        Epoch.validateState(Epoch.State.CONFIRM, epochManager);
 
         jobRegistry.updateJobStatus(jobId, IJobRegistry.JobStatus.COMPLETE);
         emit JobCompleted(jobId, job.assignedNode);
@@ -158,10 +142,8 @@ contract JobAssignmentManager is IJobAssignmentManager {
     function rejectJob(uint256 jobId, string calldata reason) external {
         IJobRegistry.Job memory job = jobRegistry.getJob(jobId);
         require(job.status == IJobRegistry.JobStatus.ASSIGNED, "JobAssignmentManager: Job not assigned");
-        require(
-            nodeRegistry.getNodeOwner(job.assignedNode) == msg.sender,
-            "JobAssignmentManager: Not assigned node owner"
-        );
+        validateNodeOwner(job);
+        Epoch.validateState(Epoch.State.CONFIRM, epochManager);
 
         // Reset job status
         jobRegistry.updateJobStatus(jobId, IJobRegistry.JobStatus.NEW);
@@ -225,5 +207,26 @@ contract JobAssignmentManager is IJobAssignmentManager {
         }
 
         return eligibleNodes;
+    }
+
+    /**
+     * @dev Validates that the caller is the owner of the node currently elected as leader
+     */
+    function validateLeader() internal view {
+        require(
+            nodeRegistry.getNodeOwner(leaderManager.getCurrentLeader()) == msg.sender,
+            "JobAssignmentManager: Not current leader"
+        );
+    }
+
+    /**
+     * @dev Validates that the caller is the owner of the assigned node for a job
+     * @param job Job to validate
+     */
+    function validateNodeOwner(IJobRegistry.Job memory job) internal view {
+        require(
+            nodeRegistry.getNodeOwner(job.assignedNode) == msg.sender,
+            "JobAssignmentManager: Not assigned node owner"
+        );
     }
 }

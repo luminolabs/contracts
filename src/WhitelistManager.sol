@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
-import "./interfaces/IWhitelistManager.sol";
-import "./interfaces/IAccessController.sol";
+import {Pausable} from "../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
+import {IWhitelistManager} from "./interfaces/IWhitelistManager.sol";
+import {Errors} from "./libraries/Errors.sol";
 
 /**
  * @title WhitelistManager
@@ -17,57 +18,31 @@ import "./interfaces/IAccessController.sol";
  * - Enforce cooldown periods between status changes
  * - Emergency pause functionality
  */
-contract WhitelistManager is IWhitelistManager, Pausable {
-    /// @dev Reference to the access control contract
-    IAccessController public immutable accessController;
+contract WhitelistManager is IWhitelistManager, AccessControlled, Pausable {
+    // Core contracts
+    //
 
+    // State variables
     /// @dev Mapping of CP addresses to their detailed information
     mapping(address => CPInfo) private cpInfo;
-
     /// @dev Array containing all currently whitelisted CP addresses
     address[] private whitelistedCPs;
-
     /// @dev Mapping of CP addresses to their index in the whitelistedCPs array
     mapping(address => uint256) private cpIndex;
 
-    /// @dev Required waiting period (7 days) before a removed CP can be re-whitelisted
     uint256 public constant WHITELIST_COOLDOWN = 7 days;
 
-    // Custom errors for more gas-efficient error handling
-    /// @dev Thrown when attempting to use address(0)
+    // Custom errors
     error ZeroAddress();
-    /// @dev Thrown when trying to whitelist an already whitelisted CP
     error AlreadyWhitelisted(address cp);
-    /// @dev Thrown when trying to operate on a non-whitelisted CP
-    error NotWhitelisted(address cp);
-    /// @dev Thrown when trying to re-whitelist a CP before cooldown period ends
     error CooldownActive(address cp, uint256 remainingTime);
-    /// @dev Thrown when querying info for a CP that was never whitelisted
     error NeverWhitelisted(address cp);
 
     /**
      * @dev Contract constructor
      * @param _accessController Address of the AccessController contract
      */
-    constructor(address _accessController) {
-        accessController = IAccessController(_accessController);
-    }
-
-    /**
-     * @dev Modifier that allows only OPERATOR_ROLE or ADMIN_ROLE to execute a function
-     */
-    modifier onlyOperator() {
-        accessController.requireRole(keccak256("OPERATOR_ROLE"));
-        _;
-    }
-
-    /**
-     * @dev Modifier that allows only ADMIN_ROLE to execute a function
-     */
-    modifier onlyAdmin() {
-        accessController.requireRole(keccak256("ADMIN_ROLE"));
-        _;
-    }
+    constructor(address _accessController) AccessControlled(_accessController) {}
 
     /**
      * @dev Add a computing provider to the whitelist
@@ -124,7 +99,7 @@ contract WhitelistManager is IWhitelistManager, Pausable {
      * Emits a {CPRemoved} event
      */
     function removeCP(address cp) external onlyOperator whenNotPaused {
-        if (!cpInfo[cp].isWhitelisted) revert NotWhitelisted(cp);
+        if (!cpInfo[cp].isWhitelisted) revert Errors.NotWhitelisted(cp);
 
         // Update CP info
         cpInfo[cp].isWhitelisted = false;
@@ -166,23 +141,5 @@ contract WhitelistManager is IWhitelistManager, Pausable {
      */
     function getWhitelistedCPs() external view returns (address[] memory) {
         return whitelistedCPs;
-    }
-
-    /**
-     * @dev Pause all whitelist operations
-     * @notice Only callable by admin
-     * @notice Used in emergency situations
-     */
-    function pause() external onlyAdmin {
-        _pause();
-    }
-
-    /**
-     * @dev Resume all whitelist operations
-     * @notice Only callable by admin
-     * @notice Used to resume operations after emergency is resolved
-     */
-    function unpause() external onlyAdmin {
-        _unpause();
     }
 }

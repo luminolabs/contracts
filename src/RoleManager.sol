@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
-import "./interfaces/IRoleManager.sol";
-import "./interfaces/IAccessController.sol";
+import {Pausable} from "../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
+import {PausableController} from "./abstracts/PausableController.sol";
+import {IRoleManager} from "./interfaces/IRoleManager.sol";
+import {Roles} from "./libraries/Roles.sol";
 
 /**
  * @title RoleManager
@@ -21,14 +23,11 @@ import "./interfaces/IAccessController.sol";
  * The contract inherits from OpenZeppelin's Pausable contract to enable
  * emergency pause functionality.
  */
-contract RoleManager is IRoleManager, Pausable {
-    // Core role definitions
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
-    bytes32 public constant CONTRACTS_ROLE = keccak256("CONTRACTS_ROLE");
-
-    // Role storage
+contract RoleManager is IRoleManager {
+    // State variables
+    /// @dev Mapping of role IDs to role members
     mapping(bytes32 => RoleData) private roles;
+    /// @dev Mapping of CPs addresses to their role IDs
     mapping(address => mapping(bytes32 => bool)) private userRoles;
 
     /**
@@ -54,7 +53,7 @@ contract RoleManager is IRoleManager, Pausable {
      * @dev Modifier to restrict function access to admin role holders
      */
     modifier onlyAdmin() {
-        if (!hasRole(ADMIN_ROLE, msg.sender)) {
+        if (!hasRole(Roles.ADMIN_ROLE, msg.sender)) {
             revert RoleManagerUnauthorized(msg.sender);
         }
         _;
@@ -65,7 +64,7 @@ contract RoleManager is IRoleManager, Pausable {
      * The deploying address is automatically granted admin role
      */
     constructor() {
-        _setupRole(ADMIN_ROLE, msg.sender);
+        _grantRole(Roles.ADMIN_ROLE, msg.sender);
     }
 
     /**
@@ -76,11 +75,11 @@ contract RoleManager is IRoleManager, Pausable {
      * @return bool True if the account has the role or is an admin
      */
     function hasRole(bytes32 role, address account) public view override returns (bool) {
-        if (role == ADMIN_ROLE) {
-            return roles[ADMIN_ROLE].members[account];
+        if (role == Roles.ADMIN_ROLE) {
+            return roles[Roles.ADMIN_ROLE].members[account];
         }
         // Admins implicitly have all roles
-        return roles[ADMIN_ROLE].members[account] || roles[role].members[account];
+        return roles[Roles.ADMIN_ROLE].members[account] || roles[role].members[account];
     }
 
     /**
@@ -88,9 +87,9 @@ contract RoleManager is IRoleManager, Pausable {
      * @param role The role to grant (must be one of the core system roles)
      * @param account The address to grant the role to (must not be zero address)
      */
-    function grantRole(bytes32 role, address account) external override onlyAdmin whenNotPaused {
+    function grantRole(bytes32 role, address account) external override onlyAdmin {
         if (account == address(0)) revert InvalidAddress(account);
-        if (role != ADMIN_ROLE && role != OPERATOR_ROLE && role != CONTRACTS_ROLE) {
+        if (role != Roles.ADMIN_ROLE && role != Roles.OPERATOR_ROLE && role != Roles.CONTRACTS_ROLE) {
             revert InvalidRole(role);
         }
 
@@ -103,31 +102,12 @@ contract RoleManager is IRoleManager, Pausable {
      * @param role The role to revoke
      * @param account The address to revoke the role from
      */
-    function revokeRole(bytes32 role, address account) external override onlyAdmin whenNotPaused {
-        if (role == ADMIN_ROLE && roles[ADMIN_ROLE].memberCount == 1) {
+    function revokeRole(bytes32 role, address account) external override onlyAdmin {
+        if (role == Roles.ADMIN_ROLE && roles[Roles.ADMIN_ROLE].memberCount == 1) {
             revert CannotRevokeAdmin();
         }
 
         _revokeRole(role, account);
-    }
-
-    /**
-     * @dev Returns the admin role that controls `role`.
-     * In this implementation, ADMIN_ROLE manages all other roles.
-     * @param role The role to query (unused in this implementation)
-     * @return bytes32 Always returns ADMIN_ROLE
-     */
-    function getRoleAdmin(bytes32) external pure override returns (bytes32) {
-        return ADMIN_ROLE;
-    }
-
-    /**
-     * @dev Setting role admin is not supported in this implementation
-     * @param role The role to set admin for
-     * @param adminRole The new admin role
-     */
-    function setRoleAdmin(bytes32, bytes32) external pure override {
-        revert("RoleManager: Operation not supported");
     }
 
     /**
@@ -143,23 +123,11 @@ contract RoleManager is IRoleManager, Pausable {
      * @dev Allows users to renounce their own roles.
      * Cannot renounce admin role if last admin.
      */
-    function renounceRole(bytes32 role) external whenNotPaused {
-        if (role == ADMIN_ROLE && roles[ADMIN_ROLE].memberCount == 1) {
+    function renounceRole(bytes32 role) external {
+        if (role == Roles.ADMIN_ROLE && roles[Roles.ADMIN_ROLE].memberCount == 1) {
             revert CannotRevokeAdmin();
         }
         _revokeRole(role, msg.sender);
-    }
-
-    /**
-     * @dev Internal function to set up a new role assignment
-     * @param role The role to assign
-     * @param account The account to receive the role
-     */
-    function _setupRole(bytes32 role, address account) private {
-        roles[role].members[account] = true;
-        roles[role].memberCount++;
-        userRoles[account][role] = true;
-        emit RoleGranted(role, account, msg.sender);
     }
 
     /**
@@ -188,21 +156,5 @@ contract RoleManager is IRoleManager, Pausable {
             userRoles[account][role] = false;
             emit RoleRevoked(role, account, msg.sender);
         }
-    }
-
-    /**
-     * @dev Pauses all role management operations.
-     * Only callable by admin.
-     */
-    function pause() external onlyAdmin {
-        _pause();
-    }
-
-    /**
-     * @dev Unpauses role management operations.
-     * Only callable by admin.
-     */
-    function unpause() external onlyAdmin {
-        _unpause();
     }
 }

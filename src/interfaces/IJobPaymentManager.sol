@@ -8,7 +8,6 @@ interface IJobPaymentManager {
 
     function processPayment(uint256 jobId) external;
     function calculateJobPayment(uint256 jobId) external view returns (uint256);
-    function withdrawEarnings() external;
     function updateFeeStructure(uint256 newBaseFee, uint256 newRatingMultiplier) external;
     function getPendingPayments(address node) external view returns (uint256);
 }

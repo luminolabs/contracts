@@ -6,7 +6,7 @@ interface INodeStakingManager {
     event StakeValidated(address indexed cp, uint256 nodeId, bool valid);
 
     function calculateRequiredStake(uint256 computeRating) external pure returns (uint256);
-    function validateStake(address cp, uint256 computeRating) external view returns (bool);
+    function validateStake(address cp, uint256 computeRating) external returns (bool);
     function updateStakeRequirement(address cp, uint256 newRequirement) external;
     function getTotalRequiredStake(address cp) external view returns (uint256);
     function getStakeRequirementForRating(uint256 computeRating) external pure returns (uint256);

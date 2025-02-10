@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "./interfaces/IRewardManager.sol";
-import "./interfaces/IEpochManagerCore.sol";
-import "./interfaces/IRewardVault.sol";
-import "./interfaces/IAccessController.sol";
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
+import {IEpochManager} from "./interfaces/IEpochManager.sol";
+import {IRewardManager} from "./interfaces/IRewardManager.sol";
+import {IRewardVault} from "./interfaces/IRewardVault.sol";
+import {Enums} from "./libraries/Enums.sol";
 
 /**
  * @title RewardManager
@@ -16,67 +17,24 @@ import "./interfaces/IAccessController.sol";
  * - Leader rewards: For nodes selected as epoch leaders
  * - Disputer rewards: For successfully identifying and reporting violations
  */
-contract RewardManager is IRewardManager {
+contract RewardManager is IRewardManager, AccessControlled {
     // Core contracts
-    IEpochManagerCore public immutable epochManager;
+    IEpochManager public immutable epochManager;
     IRewardVault public immutable rewardVault;
-    IAccessController public immutable accessController;
 
     // Custom errors
-    error Unauthorized(address caller);
-    error InvalidRewardType(RewardType rewardType);
+    error InvalidRewardType(Enums.RewardType rewardType);
     error InvalidRewardRate(uint256 rate);
-    error RewardDistributionFailed(address cp, RewardType rewardType);
+    error RewardDistributionFailed(address cp, Enums.RewardType rewardType);
     error NoPendingRewards(address cp);
 
     // Events
-    event RewardRateChanged(RewardType indexed rewardType, uint256 oldRate, uint256 newRate);
-    event RewardDistributionAttempted(address indexed cp, RewardType rewardType, bool success);
-
-    /**
-     * @notice Ensures caller has OPERATOR_ROLE
-     */
-    modifier onlyOperator() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("OPERATOR_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /**
-     * @notice Ensures caller has ADMIN_ROLE
-     */
-    modifier onlyAdmin() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("ADMIN_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /**
-     * @notice Ensures caller has CONTRACTS_ROLE
-     */
-    modifier onlyContracts() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("CONTRACTS_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /**
-     * @notice Ensures caller has either OPERATOR_ROLE or CONTRACTS_ROLE
-     */
-    modifier onlyOperatorOrContracts() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("OPERATOR_ROLE")) &&
-        !accessController.isAuthorized(msg.sender, keccak256("CONTRACTS_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
+    event RewardRateChanged(Enums.RewardType indexed rewardType, uint256 oldRate, uint256 newRate);
+    event RewardDistributionAttempted(address indexed cp, Enums.RewardType rewardType, bool success);
 
     /**
      * @notice Initializes the RewardManager contract
-     * @param _epochManager Address of the EpochManagerCore contract
+     * @param _epochManager Address of the EpochManager contract
      * @param _rewardVault Address of the RewardVault contract
      * @param _accessController Address of the AccessController contract
      * @dev Sets up immutable contract references for reward management
@@ -85,10 +43,9 @@ contract RewardManager is IRewardManager {
         address _epochManager,
         address _rewardVault,
         address _accessController
-    ) {
-        epochManager = IEpochManagerCore(_epochManager);
+    ) AccessControlled(_accessController) {
+        epochManager = IEpochManager(_epochManager);
         rewardVault = IRewardVault(_rewardVault);
-        accessController = IAccessController(_accessController);
     }
 
     /**
@@ -101,24 +58,24 @@ contract RewardManager is IRewardManager {
      */
     function distributeReward(
         address cp,
-        RewardType rewardType
+        Enums.RewardType rewardType
     ) external onlyOperatorOrContracts {
         uint256 currentEpoch = epochManager.getCurrentEpoch();
         bool success = true;
 
-        if (rewardType == RewardType.HEARTBEAT) {
+        if (rewardType == Enums.RewardType.HEARTBEAT) {
             try rewardVault.distributeHeartbeatReward(cp, currentEpoch) {
                 // Distribution successful
             } catch {
                 success = false;
             }
-        } else if (rewardType == RewardType.LEADER) {
+        } else if (rewardType == Enums.RewardType.LEADER) {
             try rewardVault.distributeLeaderReward(cp, currentEpoch) {
                 // Distribution successful
             } catch {
                 success = false;
             }
-        } else if (rewardType == RewardType.DISPUTER) {
+        } else if (rewardType == Enums.RewardType.DISPUTER) {
             try rewardVault.distributeDisputerReward(cp, currentEpoch) {
                 // Distribution successful
             } catch {
@@ -160,7 +117,7 @@ contract RewardManager is IRewardManager {
      * @dev Reverts if new rate is zero
      */
     function updateRewardRate(
-        RewardType rewardType,
+        Enums.RewardType rewardType,
         uint256 newRate
     ) external onlyAdmin {
         if (newRate == 0) {
@@ -188,7 +145,7 @@ contract RewardManager is IRewardManager {
      * @param rewardType Type of reward
      * @return uint256 Current reward rate
      */
-    function getRewardRate(RewardType rewardType) external view returns (uint256) {
+    function getRewardRate(Enums.RewardType rewardType) external view returns (uint256) {
         return rewardVault.getRewardRate(rewardType);
     }
 

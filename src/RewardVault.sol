@@ -1,81 +1,46 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {ReentrancyGuard} from "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
+import {IRewardVault} from "./interfaces/IRewardVault.sol";
+import {Enums} from "./libraries/Enums.sol";
+
 /**
  * @title RewardVault
  * @notice A vault contract that manages and distributes rewards to computing providers in the network
  * @dev This contract handles three types of rewards: heartbeat, leader, and disputer rewards
  */
-contract RewardVault is IRewardVault, ReentrancyGuard {
-    // Core state
-    /**
-     * @notice The ERC20 token used for rewards
-     * @dev This is immutable and set during contract construction
-     */
+contract RewardVault is IRewardVault, AccessControlled, ReentrancyGuard {
+    // Core contracts
     IERC20 public immutable rewardToken;
 
-    /**
-     * @notice The access controller that manages role-based permissions
-     * @dev This is immutable and set during contract construction
-     */
-    IAccessController public immutable accessController;
-
     // Reward pools
-    /**
-     * @notice Pool of tokens available for heartbeat rewards
-     * @dev Decremented when rewards are distributed, incremented when funded
-     */
     uint256 public heartbeatRewardPool;
-
-    /**
-     * @notice Pool of tokens available for leader rewards
-     * @dev Decremented when rewards are distributed, incremented when funded
-     */
     uint256 public leaderRewardPool;
-
-    /**
-     * @notice Pool of tokens available for disputer rewards
-     * @dev Decremented when rewards are distributed, incremented when funded
-     */
     uint256 public disputerRewardPool;
 
     // Reward rates
-    /**
-     * @notice Amount of tokens given per heartbeat reward
-     * @dev Can be updated by admin, must be non-zero
-     */
     uint256 public heartbeatRewardRate;
-
-    /**
-     * @notice Amount of tokens given per leader reward
-     * @dev Can be updated by admin, must be non-zero
-     */
     uint256 public leaderRewardRate;
-
-    /**
-     * @notice Amount of tokens given per disputer reward
-     * @dev Can be updated by admin, must be non-zero
-     */
     uint256 public disputerRewardRate;
 
-    // Tracking
-    /**
-     * @notice Tracks total rewards distributed in each epoch
-     * @dev Mapping from epoch number to total rewards
-     */
+    // State variables
+    /// @dev Tracks rewards distributed in each epoch
     mapping(uint256 => uint256) public epochRewards;
-
-    /**
-     * @notice Tracks unclaimed rewards for each address
-     * @dev Mapping from address to pending reward amount
-     */
+    /// @dev Tracks pending rewards for each computing provider
     mapping(address => uint256) public pendingRewards;
-
-    /**
-     * @notice Tracks total rewards earned by each address
-     * @dev Mapping from address to total earned rewards
-     */
+    /// @dev Tracks total rewards earned by each computing provider
     mapping(address => uint256) public totalRewardsEarned;
+
+    // Custom errors
+    error ZeroAmount();
+    error ZeroAddress();
+    error InsufficientPoolBalance(uint256 required, uint256 available);
+    error NoPendingRewards();
+    error TransferFailed();
+    error InvalidRewardRate();
 
     /**
      * @notice Initializes the reward vault
@@ -91,94 +56,189 @@ contract RewardVault is IRewardVault, ReentrancyGuard {
         uint256 _heartbeatRate,
         uint256 _leaderRate,
         uint256 _disputerRate
-    );
+    ) AccessControlled(_accessController) {
+        if (_rewardToken == address(0) || _accessController == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_heartbeatRate == 0 || _leaderRate == 0 || _disputerRate == 0) {
+            revert InvalidRewardRate();
+        }
 
-/**
- * @notice Adds funds to the heartbeat reward pool
-     * @dev Only callable by admin
+        rewardToken = IERC20(_rewardToken);
+        heartbeatRewardRate = _heartbeatRate;
+        leaderRewardRate = _leaderRate;
+        disputerRewardRate = _disputerRate;
+    }
+
+    /**
+     * @notice Adds funds to the heartbeat reward pool
      * @param amount Amount of tokens to add to the pool
      */
-function fundHeartbeatPool(uint256 amount) external;
+    function fundHeartbeatPool(uint256 amount) external onlyAdmin {
+        if (amount == 0) revert ZeroAmount();
 
-/**
- * @notice Adds funds to the leader reward pool
-     * @dev Only callable by admin
+        bool success = rewardToken.transferFrom(msg.sender, address(this), amount);
+        if (!success) revert TransferFailed();
+
+        heartbeatRewardPool += amount;
+        emit RewardPoolFunded(Enums.RewardType.HEARTBEAT, amount);
+    }
+
+    /**
+     * @notice Adds funds to the leader reward pool
      * @param amount Amount of tokens to add to the pool
      */
-function fundLeaderPool(uint256 amount) external;
+    function fundLeaderPool(uint256 amount) external onlyAdmin {
+        if (amount == 0) revert ZeroAmount();
 
-/**
- * @notice Adds funds to the disputer reward pool
-     * @dev Only callable by admin
+        bool success = rewardToken.transferFrom(msg.sender, address(this), amount);
+        if (!success) revert TransferFailed();
+
+        leaderRewardPool += amount;
+        emit RewardPoolFunded(Enums.RewardType.LEADER, amount);
+    }
+
+    /**
+     * @notice Adds funds to the disputer reward pool
      * @param amount Amount of tokens to add to the pool
      */
-function fundDisputerPool(uint256 amount) external;
+    function fundDisputerPool(uint256 amount) external onlyAdmin {
+        if (amount == 0) revert ZeroAmount();
 
-/**
- * @notice Distributes a heartbeat reward to a recipient
-     * @dev Only callable by contracts with CONTRACTS_ROLE
+        bool success = rewardToken.transferFrom(msg.sender, address(this), amount);
+        if (!success) revert TransferFailed();
+
+        disputerRewardPool += amount;
+        emit RewardPoolFunded(Enums.RewardType.DISPUTER, amount);
+    }
+
+    /**
+     * @notice Distributes a heartbeat reward to a recipient
      * @param recipient Address to receive the reward
      * @param epoch Current epoch number
      */
-function distributeHeartbeatReward(address recipient, uint256 epoch) external;
+    function distributeHeartbeatReward(address recipient, uint256 epoch) external onlyContracts {
+        if (heartbeatRewardPool < heartbeatRewardRate) {
+            revert InsufficientPoolBalance(heartbeatRewardRate, heartbeatRewardPool);
+        }
 
-/**
- * @notice Distributes a leader reward to a recipient
-     * @dev Only callable by contracts with CONTRACTS_ROLE
+        heartbeatRewardPool -= heartbeatRewardRate;
+        pendingRewards[recipient] += heartbeatRewardRate;
+        totalRewardsEarned[recipient] += heartbeatRewardRate;
+        epochRewards[epoch] += heartbeatRewardRate;
+
+        emit RewardDistributed(recipient, heartbeatRewardRate, Enums.RewardType.HEARTBEAT);
+    }
+
+    /**
+     * @notice Distributes a leader reward to a recipient
      * @param recipient Address to receive the reward
      * @param epoch Current epoch number
      */
-function distributeLeaderReward(address recipient, uint256 epoch) external;
+    function distributeLeaderReward(address recipient, uint256 epoch) external onlyContracts {
+        if (leaderRewardPool < leaderRewardRate) {
+            revert InsufficientPoolBalance(leaderRewardRate, leaderRewardPool);
+        }
 
-/**
- * @notice Distributes a disputer reward to a recipient
-     * @dev Only callable by contracts with CONTRACTS_ROLE
+        leaderRewardPool -= leaderRewardRate;
+        pendingRewards[recipient] += leaderRewardRate;
+        totalRewardsEarned[recipient] += leaderRewardRate;
+        epochRewards[epoch] += leaderRewardRate;
+
+        emit RewardDistributed(recipient, leaderRewardRate, Enums.RewardType.LEADER);
+    }
+
+    /**
+     * @notice Distributes a disputer reward to a recipient
      * @param recipient Address to receive the reward
      * @param epoch Current epoch number
      */
-function distributeDisputerReward(address recipient, uint256 epoch) external;
+    function distributeDisputerReward(address recipient, uint256 epoch) external onlyContracts {
+        if (disputerRewardPool < disputerRewardRate) {
+            revert InsufficientPoolBalance(disputerRewardRate, disputerRewardPool);
+        }
 
-/**
- * @notice Allows users to claim their pending rewards
-     * @dev Uses ReentrancyGuard, requires non-zero pending rewards
+        disputerRewardPool -= disputerRewardRate;
+        pendingRewards[recipient] += disputerRewardRate;
+        totalRewardsEarned[recipient] += disputerRewardRate;
+        epochRewards[epoch] += disputerRewardRate;
+
+        emit RewardDistributed(recipient, disputerRewardRate, Enums.RewardType.DISPUTER);
+    }
+
+    /**
+     * @notice Allows users to claim their pending rewards
      */
-function claimRewards() external;
+    function claimRewards() external nonReentrant {
+        uint256 amount = pendingRewards[msg.sender];
+        if (amount == 0) revert NoPendingRewards();
 
-/**
- * @notice Updates the rate for a specific reward type
-     * @dev Only callable by admin, new rate must be non-zero
+        pendingRewards[msg.sender] = 0;
+
+        bool success = rewardToken.transfer(msg.sender, amount);
+        if (!success) revert TransferFailed();
+
+        emit RewardsClaimed(msg.sender, amount);
+    }
+
+    /**
+     * @notice Updates the rate for a specific reward type
      * @param rewardType Type of reward (HEARTBEAT, LEADER, or DISPUTER)
      * @param newRate New reward rate to set
      */
-function updateRewardRate(RewardType rewardType, uint256 newRate) external;
+    function updateRewardRate(Enums.RewardType rewardType, uint256 newRate) external onlyAdmin {
+        if (newRate == 0) revert InvalidRewardRate();
 
-// View Functions
+        if (rewardType == Enums.RewardType.HEARTBEAT) {
+            heartbeatRewardRate = newRate;
+        } else if (rewardType == Enums.RewardType.LEADER) {
+            leaderRewardRate = newRate;
+        } else if (rewardType == Enums.RewardType.DISPUTER) {
+            disputerRewardRate = newRate;
+        }
 
-/**
- * @notice Gets the current balance of a reward pool
+        emit RewardRateUpdated(rewardType, newRate);
+    }
+
+    /**
+     * @notice Gets the current balance of a reward pool
      * @param rewardType Type of reward pool to query
      * @return uint256 Current balance of the specified pool
      */
-function getRewardPoolBalance(RewardType rewardType) external view returns (uint256);
+    function getRewardPoolBalance(Enums.RewardType rewardType) external view returns (uint256) {
+        if (rewardType == Enums.RewardType.HEARTBEAT) return heartbeatRewardPool;
+        if (rewardType == Enums.RewardType.LEADER) return leaderRewardPool;
+        if (rewardType == Enums.RewardType.DISPUTER) return disputerRewardPool;
+        return 0;
+    }
 
-/**
- * @notice Gets pending rewards for a recipient
+    /**
+     * @notice Gets pending rewards for a recipient
      * @param recipient Address to query
      * @return uint256 Amount of unclaimed rewards
      */
-function getPendingRewards(address recipient) external view returns (uint256);
+    function getPendingRewards(address recipient) external view returns (uint256) {
+        return pendingRewards[recipient];
+    }
 
-/**
- * @notice Gets total rewards distributed in an epoch
+    /**
+     * @notice Gets total rewards distributed in an epoch
      * @param epoch Epoch number to query
      * @return uint256 Total rewards distributed in the epoch
      */
-function getEpochRewards(uint256 epoch) external view returns (uint256);
+    function getEpochRewards(uint256 epoch) external view returns (uint256) {
+        return epochRewards[epoch];
+    }
 
-/**
- * @notice Gets the current rate for a reward type
+    /**
+     * @notice Gets the current rate for a reward type
      * @param rewardType Type of reward to query
      * @return uint256 Current reward rate
      */
-function getRewardRate(RewardType rewardType) external view returns (uint256);
+    function getRewardRate(Enums.RewardType rewardType) external view returns (uint256) {
+        if (rewardType == Enums.RewardType.HEARTBEAT) return heartbeatRewardRate;
+        if (rewardType == Enums.RewardType.LEADER) return leaderRewardRate;
+        if (rewardType == Enums.RewardType.DISPUTER) return disputerRewardRate;
+        return 0;
+    }
 }

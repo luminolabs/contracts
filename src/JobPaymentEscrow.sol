@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
-import "./interfaces/IJobPaymentEscrow.sol";
-import "./interfaces/IAccessController.sol";
+import {Pausable} from "../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
+import {ReentrancyGuard} from "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import {AccessControlled} from "./abstracts/AccessControlled.sol";
+import {PausableController} from "./abstracts/PausableController.sol";
+import {IAccessController} from "./interfaces/IAccessController.sol";
+import {IJobPaymentEscrow} from "./interfaces/IJobPaymentEscrow.sol";
 
 /**
  * @title JobPaymentEscrow
@@ -20,78 +23,36 @@ import "./interfaces/IAccessController.sol";
  * - Lock periods for withdrawals to prevent rapid fund drainage
  * - Emergency pause functionality for system-wide issues
  */
-contract JobPaymentEscrow is IJobPaymentEscrow, ReentrancyGuard {
+contract JobPaymentEscrow is IJobPaymentEscrow, PausableController, ReentrancyGuard {
     // Core contracts
-    IAccessController public immutable accessController;
+    //
 
     // Constants
-    /// @notice Duration that withdrawn funds must be locked before release
     uint256 public constant LOCK_PERIOD = 1 days;
-    /// @notice Minimum amount that can be deposited
     uint256 public constant MIN_DEPOSIT = 0.1 ether;
-    /// @notice Minimum balance required to submit jobs
     uint256 public constant MIN_BALANCE = 0.01 ether;
 
     // State variables
-    /// @notice Mapping of user addresses to their escrow balances
     mapping(address => uint256) public balances;
-    /// @notice Mapping of user addresses to their withdrawal requests
     mapping(address => WithdrawRequest) public withdrawRequests;
-    /// @notice System pause state
-    bool public paused;
 
     // Custom errors
-    error Unauthorized(address caller);
     error BelowMinimumDeposit(uint256 provided, uint256 minimum);
     error InsufficientBalance(address user, uint256 requested, uint256 available);
     error ExistingWithdrawRequest(address user);
     error NoWithdrawRequest(address user);
     error LockPeriodActive(address user, uint256 remainingTime);
     error TransferFailed();
-    error SystemPaused();
     error InsufficientContractBalance(uint256 requested, uint256 available);
 
     // Events
-    event SystemPaused(address indexed operator);
-    event SystemUnpaused(address indexed operator);
-
-    /**
-     * @notice Restricts access to admin role
-     */
-    modifier onlyAdmin() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("ADMIN_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /**
-     * @notice Restricts access to contract role
-     */
-    modifier onlyContracts() {
-        if (!accessController.isAuthorized(msg.sender, keccak256("CONTRACTS_ROLE"))) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /**
-     * @notice Ensures system is not paused
-     */
-    modifier whenNotPaused() {
-        if (paused) {
-            revert SystemPaused();
-        }
-        _;
-    }
+    //
 
     /**
      * @notice Initializes the escrow contract
      * @param _accessController Address of the access controller contract
      */
-    constructor(address _accessController) {
-        accessController = IAccessController(_accessController);
-    }
+    constructor(address _accessController) PausableController(_accessController) {}
 
     /**
      * @notice Allows users to deposit funds into escrow
@@ -171,7 +132,7 @@ contract JobPaymentEscrow is IJobPaymentEscrow, ReentrancyGuard {
         balances[msg.sender] -= amount;
         delete withdrawRequests[msg.sender];
 
-        (bool success, ) = msg.sender.call{value: amount}("");
+        (bool success,) = msg.sender.call{value: amount}("");
         if (!success) {
             revert TransferFailed();
         }
@@ -197,7 +158,7 @@ contract JobPaymentEscrow is IJobPaymentEscrow, ReentrancyGuard {
             revert InsufficientContractBalance(amount, address(this).balance);
         }
 
-        (bool success, ) = node.call{value: amount}("");
+        (bool success,) = node.call{value: amount}("");
         if (!success) {
             revert TransferFailed();
         }
@@ -211,11 +172,7 @@ contract JobPaymentEscrow is IJobPaymentEscrow, ReentrancyGuard {
      * @dev Protected against reentrancy attacks
      * @dev Emits an {EmergencyWithdraw} event upon successful withdrawal
      */
-    function emergencyWithdraw() external nonReentrant onlyAdmin {
-        if (!paused) {
-            revert SystemPaused();
-        }
-
+    function emergencyWithdraw() external nonReentrant onlyAdmin whenNotPaused {
         uint256 balance = balances[msg.sender];
         if (balance == 0) {
             revert InsufficientBalance(msg.sender, 0, 0);
@@ -224,32 +181,12 @@ contract JobPaymentEscrow is IJobPaymentEscrow, ReentrancyGuard {
         balances[msg.sender] = 0;
         delete withdrawRequests[msg.sender];
 
-        (bool success, ) = msg.sender.call{value: balance}("");
+        (bool success,) = msg.sender.call{value: balance}("");
         if (!success) {
             revert TransferFailed();
         }
 
         emit EmergencyWithdraw(msg.sender, balance);
-    }
-
-    /**
-     * @notice Pauses the escrow system
-     * @dev Only callable by admin
-     * @dev Emits a {SystemPaused} event
-     */
-    function pause() external onlyAdmin whenNotPaused {
-        paused = true;
-        emit SystemPaused(msg.sender);
-    }
-
-    /**
-     * @notice Unpauses the escrow system
-     * @dev Only callable by admin
-     * @dev Emits a {SystemUnpaused} event
-     */
-    function unpause() external onlyAdmin {
-        paused = false;
-        emit SystemUnpaused(msg.sender);
     }
 
     /**
