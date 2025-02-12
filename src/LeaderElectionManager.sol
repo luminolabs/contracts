@@ -3,11 +3,9 @@ pragma solidity ^0.8.17;
 
 import {AccessControlled} from "./abstracts/AccessControlled.sol";
 import {IAccessController} from "./interfaces/IAccessController.sol";
-import {IEpochManager} from "./interfaces/IEpochManager.sol";
 import {ILeaderElectionManager} from "./interfaces/ILeaderElectionManager.sol";
 import {INodeRegistryCore} from "./interfaces/INodeRegistryCore.sol";
 import {IStakingCore} from "./interfaces/IStakingCore.sol";
-import {Epoch} from "./libraries/Epoch.sol";
 import {Nodes} from "./libraries/Nodes.sol";
 
 /**
@@ -28,7 +26,6 @@ import {Nodes} from "./libraries/Nodes.sol";
  */
 contract LeaderElectionManager is ILeaderElectionManager, AccessControlled {
     // Core contracts
-    IEpochManager public immutable epochManager;
     INodeRegistryCore public immutable nodeRegistry;
     IStakingCore public immutable stakingCore;
 
