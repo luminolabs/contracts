@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./ACL.sol";
+import "../ACL.sol";
 
 /**
  * @title Whitelist
@@ -84,7 +84,7 @@ contract Whitelist is ACL {
         // Only add if not already whitelisted
         if (!whitelist[addr]) {
             whitelist[addr] = true;
-            emit WhitelistedAddressAdded(addr);
+            emit CPWhitelisted(addr);
             return true;
         }
         return false;
@@ -117,7 +117,7 @@ contract Whitelist is ACL {
         
         // Emit batch event if any address was added
         if (anySuccess) {
-            emit CPWhitelisted(addrs);
+            emit BatchWhitelistAdded(addrs);
         }
         
         return anySuccess;
@@ -187,13 +187,5 @@ contract Whitelist is ACL {
         returns (bool) 
     {
         return whitelist[addr];
-    }
-
-    /**
-     * @dev Get list of all currently whitelisted computing providers
-     * @return address[] Array of whitelisted CP addresses
-     */
-    function getWhitelistedCPs() external view returns (address[] memory) {
-        return whitelistedCPs;
     }
 }
