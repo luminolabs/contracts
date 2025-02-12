@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./storage/Constants.sol";
+import {Shared} from "./storage/Shared.sol";
 
 /**
  * @title EpochManager
@@ -22,7 +22,7 @@ import "./storage/Constants.sol";
  * - Verify if system is in a specific phase
  * - Handle emergency pausing of the epoch system
  */
-contract EpochManager is Constants {
+contract EpochManager is Shared {
 
     /**
      * @dev Modifier to ensure the function is called with the correct epoch.
@@ -38,7 +38,7 @@ contract EpochManager is Constants {
      * @param _state The expected state.
      */
     modifier checkState(State _state) {
-        (State current, ) = getState();
+        (State current,) = getState();
         require(current == _state, "Not allowed state");
         _;
     }
@@ -50,7 +50,7 @@ contract EpochManager is Constants {
      */
     modifier checkEpochAndState(uint32 epoch, State state) {
         require(getEpoch() == epoch, "Not the expected epoch");
-        (State currentState, ) = getState();
+        (State currentState,) = getState();
         require(currentState == state, "Not the expected state");
         _;
     }
