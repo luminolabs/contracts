@@ -3,9 +3,9 @@ pragma solidity ^0.8.17;
 
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
-import {AccessControlled} from "./abstracts/AccessControlled.sol";
 import {WhitelistControlled} from "./abstracts/WhitelistControlled.sol";
 import {IStakingCore} from "./interfaces/IStakingCore.sol";
+import {Shared} from "./storage/Shared.sol";
 
 /**
  * @title StakingCore
@@ -20,7 +20,7 @@ import {IStakingCore} from "./interfaces/IStakingCore.sol";
  * - Implements a time lock for unstaking to prevent rapid stake/unstake cycles
  * - Only authorized contracts can apply penalties
  */
-contract StakingCore is IStakingCore, AccessControlled, WhitelistControlled, ReentrancyGuard {
+contract StakingCore is IStakingCore, WhitelistControlled, ReentrancyGuard {
     // Core contracts
     IERC20 public immutable stakingToken;
 
