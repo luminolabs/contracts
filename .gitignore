@@ -20,7 +20,7 @@ testnet.txt
 repomix-output.txt
 
 # Other files
-slither-results.sarif\
+slither-results.sarif
 node_modules
 lcov.info
 .DS_Store
