@@ -24,32 +24,20 @@ contract Whitelist is ACL {
      * @dev Maximum batch size for adding/removing addresses
      * @notice This prevents out-of-gas errors in batch operations
      */
-    uint256 public constant MAX_BATCH_SIZE = 100;
+    uint8 public constant MAX_BATCH_SIZE = 100;
     
     // Events
-    /**
-     * @dev Emitted when a single address is added to the whitelist
-     * @param addr The address that was added
-     */
-    event CPWhitelisted(address indexed addr);
-    
-    /**
-     * @dev Emitted when a single address is removed from the whitelist
-     * @param addr The address that was removed
-     */
-    event CPRemoved(address indexed addr);
-    
     /**
      * @dev Emitted when multiple addresses are added in a batch
      * @param addrs Array of addresses that were added
      */
-    event BatchWhitelistAdded(address[] addrs);
+    event BatchCPWhitelisted(address[] addrs);
     
     /**
      * @dev Emitted when multiple addresses are removed in a batch
      * @param addrs Array of addresses that were removed
      */
-    event BatchWhitelistRemoved(address[] addrs);
+    event BatchCPRemoved(address[] addrs);
 
     /**
      * @dev Modifier to restrict function access to whitelisted addresses only
@@ -67,27 +55,6 @@ contract Whitelist is ACL {
      */
     function isValidAddress(address addr) internal pure returns (bool) {
         return addr != address(0);
-    }
-
-    /**
-     * @dev Add a single address to the whitelist
-     * @param addr Address to be added to the whitelist
-     * @return success True if the address was added, false if it was already whitelisted
-     */
-    function addAddressToWhitelist(address addr)  
-        public 
-        returns(bool success) 
-    {
-        require(isValidAddress(addr), "Invalid address provided");
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only Admin can add addresses to whitelist");
-        
-        // Only add if not already whitelisted
-        if (!whitelist[addr]) {
-            whitelist[addr] = true;
-            emit CPWhitelisted(addr);
-            return true;
-        }
-        return false;
     }
 
     /**
@@ -117,31 +84,10 @@ contract Whitelist is ACL {
         
         // Emit batch event if any address was added
         if (anySuccess) {
-            emit BatchWhitelistAdded(addrs);
+            emit BatchCPWhitelisted(addrs);
         }
         
         return anySuccess;
-    }
-
-    /**
-     * @dev Remove a single address from the whitelist
-     * @param addr Address to be removed from the whitelist
-     * @return success True if the address was removed, false if it wasn't whitelisted
-     */
-    function removeAddressFromWhitelist(address addr) 
-        public 
-        returns(bool success) 
-    {
-        require(isValidAddress(addr), "Invalid address provided");
-        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Only Admin can add addresses to whitelist");
-        
-        // Only remove if currently whitelisted
-        if (whitelist[addr]) {
-            whitelist[addr] = false;
-            emit CPRemoved(addr);
-            return true;
-        }
-        return false;
     }
 
     /**
@@ -170,7 +116,7 @@ contract Whitelist is ACL {
         
         // Emit batch event if any address was removed
         if (anySuccess) {
-            emit BatchWhitelistRemoved(addrs);
+            emit BatchCPRemoved(addrs);
         }
         
         return anySuccess;
