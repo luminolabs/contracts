@@ -24,7 +24,7 @@ contract Whitelist is ACL {
      * @dev Maximum batch size for adding/removing addresses
      * @notice This prevents out-of-gas errors in batch operations
      */
-    uint256 public constant MAX_BATCH_SIZE = 100;
+    uint8 public constant MAX_BATCH_SIZE = 100;
     
     // Events
     /**
