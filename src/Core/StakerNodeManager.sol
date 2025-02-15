@@ -50,6 +50,15 @@ contract StakerNodeManager is StakerNodeStorage, Shared, Initializable, ACL, Epo
     // }
 
     /**
+     * @dev Modifier to verify node exists
+     * @param _nodeId ID of the node to check
+     */
+    modifier nodeExists(uint32 _nodeId) {
+        require(nodes[msg.sender][_nodeId]._cpAddress != ZERO_ADDRESS, "Node doesn't exists");
+        _;
+    }
+
+    /**
      * @notice Stake tokens into the system
      * @dev Requires provider to be whitelisted and stake at least MIN_STAKE
      * Tokens are transferred from the provider to this contract
@@ -85,7 +94,7 @@ contract StakerNodeManager is StakerNodeStorage, Shared, Initializable, ACL, Epo
                 epochFirstStaked: _epoch,    
                 epochLastPenalized: 0,  
                 nodeStake: _amount,
-                computeRating: 0
+                computePower: 0
             });
 
             // emit event
@@ -99,21 +108,12 @@ contract StakerNodeManager is StakerNodeStorage, Shared, Initializable, ACL, Epo
 
             // emit events
         }   
-        // if (amount < MIN_STAKE) {
-        //     revert BelowMinimumStake(amount, MIN_STAKE);
-        // }
-
-        // uint256 oldStake = stakes[msg.sender];
-        // stakes[msg.sender] += amount;
-
         // // Transfer tokens
         // bool success = stakingToken.transferFrom(msg.sender, address(this), amount);
         // if (!success) {
         //     revert TransferFailed();
         // }
 
-        // emit StakeUpdated(msg.sender, oldStake, stakes[msg.sender]);
-        // emit Staked(msg.sender, amount);
     }
 
     /**
@@ -200,52 +200,66 @@ contract StakerNodeManager is StakerNodeStorage, Shared, Initializable, ACL, Epo
     //     emit StakeUpdated(cp, oldStake, stakes[cp]);
     // }
 
-    // View functions
+    /**
+     * @notice Validates if a CP has sufficient stake for a given compute power
+     * @dev Checks both existing requirements and new power requirements
+     * @param _cpAddress Address of the Computing Provider
+     * @param _nodeId nodeId for which the stake needs to be validated
+     * @param _computePower Compute power to validate stake against
+     * @return bool True if CP has sufficient stake, false otherwise
+     */
+    function validateStake(address _cpAddress, uint32 _nodeId, uint32 _computePower) public view returns (bool) {
+        uint256 newRequirement = calculateRequiredStake(_computePower);
+
+        bool isValid = nodes[_cpAddress][_nodeId].nodeStake >= newRequirement;
+
+        // emit StakeValidated(cp, computepower, isValid);
+        return isValid;
+    }
 
     /**
-     * @notice Get the current staked balance of a provider
-     * @param cp Address of the computing provider
-     * @return uint256 Current staked balance
+     * @notice Calculates required stake amount based on compute power
+     * @dev Uses STAKE_PER_power constant to determine required stake
+     * @param _computePower The compute power of the node
+     * @return uint256 Required stake amount in tokens
      */
-    // function getStakedBalance(address cp) external view returns (uint256) {
-    //     return stakes[cp];
-    // }
+    function calculateRequiredStake(uint32 _computePower) public pure returns (uint256) {
+        return _computePower * STAKE_PER_POWER;
+    }
 
     /**
-     * @notice Check if a provider has an active unstake request
-     * @param cp Address of the computing provider
-     * @return bool True if there is an active unstake request
+     * @dev Register a new compute node with their respective power
+     * @dev To be called right after a cp has staked enough funds
+     * @param _computePower Compute power indicating node's processing capacity
+     * @return true if the node is activated
+     *
+     * Requirements:
+     * - Computing provider must be whitelisted
+     * - Computing provider must have sufficient stake for the compute power
+     *
+     * Emits a {NodeRegistered} event
      */
-    // function hasUnstakeRequest(address cp) external view returns (bool) {
-    //     return unstakeRequests[cp].amount > 0;
-    // }
+    // function registerNode(uint256 computepower) external isWhitelisted returns (uint256) {
+    function activateOrUpdateNodeWithPower(uint32 _nodeId, uint32 _computePower) external returns (bool) {
+        require(validateStake(msg.sender, _nodeId, _computePower), "Not enough stake for provided power" );
 
-    /**
-     * @notice Get details of a provider's unstake request
-     * @param cp Address of the computing provider
-     * @return amount The requested unstake amount
-     * @return requestTime The timestamp when the request was made
-     */
-    // function getUnstakeRequestDetails(address cp)
-    // external
-    // view
-    // returns (uint256 amount, uint256 requestTime)
-    // {
-    //     UnstakeRequest memory request = unstakeRequests[cp];
-    //     return (request.amount, request.timestamp);
-    // }
+        // Remove from old pool
+        uint32 oldPower = nodes[msg.sender][_nodeId].computePower;
+        uint32[] storage oldPool = poolNodes[oldPower];
+        for (uint256 i = 0; i < oldPool.length; i++) {
+            if (oldPool[i] == _nodeId) {
+                oldPool[i] = oldPool[oldPool.length - 1];
+                oldPool.pop();
+                break;
+            }
+        }
 
-    /**
-     * @notice Get remaining lock time for an unstake request
-     * @param cp Address of the computing provider
-     * @return uint256 Remaining time in seconds, 0 if no request or lock expired
-     */
-    // function getRemainingLockTime(address cp) external view returns (uint256) {
-    //     UnstakeRequest memory request = unstakeRequests[cp];
-    //     if (request.amount == 0) return 0;
+        nodes[msg.sender][_nodeId].isActive = true;
+        nodes[msg.sender][_nodeId].computePower = _computePower;
 
-    //     uint256 lockEndTime = request.timestamp + LOCK_PERIOD;
-    //     if (block.timestamp >= lockEndTime) return 0;
-    //     return lockEndTime - block.timestamp;
-    // }
+        poolNodes[_computePower].push(_nodeId);
+
+        // emit NodeActivatedOrUpdated(msg.sender, nodeCounter, computepower);
+        return true;
+    }
 }
