@@ -26,7 +26,8 @@ contract Shared {
     error LockPeriodActive(address cp, uint256 remainingTime);
     error TransferFailed();
     error ZeroAddress();
-
+    error NodeNotFound(uint256 nodeId);
+    error NodeNotActive(uint256 nodeId);
 
     /**
      * @notice Duration that stakes must be locked before withdrawal
@@ -41,4 +42,11 @@ contract Shared {
      * @dev Set to 100 tokens to ensure meaningful economic stake
      */
     uint256 public constant MIN_STAKE = 100 ether; // 100 tokens minimum
+    /**
+     * @notice Amount of stake required per unit of compute power
+     * @dev Set to 1 token (1e18) per compute power unit
+     */
+    uint256 public constant STAKE_PER_POWER = 1e18;
+    address ZERO_ADDRESS = 0x0000000000000000000000000000000000000000;
+
 }

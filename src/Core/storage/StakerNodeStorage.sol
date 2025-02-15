@@ -32,8 +32,8 @@ abstract contract StakerNodeStorage {
         uint32 age;                 // Number of epochs the staker has been active
         uint32 epochFirstStaked;    // Epoch when the staker first staked
         uint32 epochLastPenalized;  // Last epoch when the staker was penalized
+        uint32 computePower;
         uint256 nodeStake;
-        uint256 computeRating;
     }
 
     /**
@@ -49,7 +49,7 @@ abstract contract StakerNodeStorage {
      /// @notice Tracks locked stakes for each node of a staker address
     mapping(address => mapping(uint32 =>Lock)) public locks;
     /// @notice Mapping from pool ID (compute rating) to node IDs in that pool
-    mapping(uint16 => uint32[]) public poolNodes;
+    mapping(uint32 => uint32[]) public poolNodes;
     
     
 }
