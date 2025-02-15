@@ -5,7 +5,7 @@ import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 // import {IStakingCore} from "./interfaces/IStakingCore.sol";
 import "../../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
-import {Shared} from "./storage/Shared.sol";
+import "./storage/Shared.sol";
 import "./storage/StakerNodeStorage.sol";
 import "./EpochManager.sol";
 import "./ACL.sol";
