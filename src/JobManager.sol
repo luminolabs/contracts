@@ -15,7 +15,7 @@ contract JobManager is IJobManager {
     ILeaderManager private immutable leaderManager;
     IEpochManager private immutable epochManager;
     IJobEscrow private immutable jobEscrow;
-    IAccessManager private immutable accessController;
+    IAccessManager private immutable accessManager;
 
     // State variables
     uint256 private jobCounter;
@@ -40,13 +40,13 @@ contract JobManager is IJobManager {
         address _leaderManager,
         address _epochManager,
         address _jobEscrow,
-        address _accessController
+        address _accessManager
     ) {
         nodeManager = INodeManager(_nodeManager);
         leaderManager = ILeaderManager(_leaderManager);
         epochManager = IEpochManager(_epochManager);
         jobEscrow = IJobEscrow(_jobEscrow);
-        accessController = IAccessManager(_accessController);
+        accessManager = IAccessManager(_accessManager);
     }
 
     function submitJob(
