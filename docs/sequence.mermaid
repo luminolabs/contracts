@@ -1,73 +1,75 @@
 sequenceDiagram
     participant CP as Computing Provider
     participant WM as WhitelistManager
-    participant SC as StakingCore
-    participant NR as NodeRegistryCore
-    participant NS as NodeStakingManager
-    participant EM as EpochManagerCore
-    participant LE as LeaderElectionManager
-    participant JR as JobRegistry
-    participant JA as JobAssignmentManager
-    participant JP as JobPaymentManager
-    participant PE as JobPaymentEscrow
-    participant RM as RewardManager
-    participant RV as RewardVault
-    participant PM as PenaltyManager
+    participant NM as NodeManager
+    participant NE as NodeEscrow
+    participant EM as EpochManager
+    participant LM as LeaderManager
+    participant JM as JobManager
+    participant JE as JobEscrow
+    participant IM as IncentiveManager
+    participant IT as IncentiveTreasury
 
-%% CP Registration and Staking
+%% Onboarding Phase
+    Note over CP,IT: 1. Onboarding
     CP->>WM: addCP()
     WM-->>CP: CPAdded event
-    CP->>SC: stake(amount)
-    SC->>WM: isWhitelisted(cp)
-    WM-->>SC: true
-    SC-->>CP: Staked event
+    CP->>NE: deposit(stake)
+    NE-->>CP: Deposited event
+    CP->>NM: registerNode(computeRating)
+    NM->>WM: requireWhitelisted(cp)
+    NM->>NE: requireBalance(cp, stakeRequired)
+    NM-->>CP: NodeRegistered event
 
-%% Node Registration
-    CP->>NR: registerNode(computeRating)
-    NR->>WM: isWhitelisted(cp)
-    WM-->>NR: true
-    NR->>NS: validateStake(cp, computeRating)
-    NS->>SC: getStakedBalance(cp)
-    SC-->>NS: balance
-    NS-->>NR: true
-    NR-->>CP: NodeRegistered event
+%% Epoch Commitment Phase
+    Note over CP,IT: 2. Epoch Commitment
+    CP->>EM: getCurrentEpoch()
+    EM-->>CP: epoch
+    CP->>LM: submitCommitment(nodeId, commitment)
+    LM->>EM: validateEpochState(COMMIT)
+    LM->>NM: validateNodeOwner(nodeId, msg.sender)
+    LM-->>CP: CommitSubmitted event
 
-%% Epoch and Leader Election
-    Note over EM: New epoch starts
-    EM-->>LE: getCurrentEpoch()
-    CP->>LE: submitCommitment(nodeId, commitment)
-    Note over EM: REVEAL phase
-    CP->>LE: revealSecret(nodeId, secret)
-    Note over EM: ELECT phase
-    LE->>EM: isInPhase(ELECT)
-    EM-->>LE: true
-    LE-->>CP: LeaderElected event
+%% Secret Reveal Phase
+    Note over CP,IT: 3. Secret Reveal
+    CP->>LM: revealSecret(nodeId, secret)
+    LM->>EM: validateEpochState(REVEAL)
+    LM->>NM: validateNodeOwner(nodeId, msg.sender)
+    LM-->>CP: SecretRevealed event
 
-%% Job Assignment
-    Note over EM: EXECUTE phase
-    LE->>JA: startAssignmentRound()
-    JA->>JR: getJobsByStatus(NEW)
-    JR-->>JA: newJobs[]
-    JA->>NR: getNodesInPool(poolId)
-    NR-->>JA: availableNodes[]
-    JA->>JR: assignNode(jobId, nodeId)
-    JR-->>CP: JobAssigned event
+%% Leader Election Phase
+    Note over CP,IT: 4. Leader Election
+    CP->>LM: electLeader()
+    LM->>EM: validateEpochState(ELECT)
+    LM-->>CP: LeaderElected event
 
-%% Job Execution and Payment
-    CP->>JR: updateJobStatus(jobId, COMPLETE)
-    JR->>JP: processPayment(jobId)
-    JP->>PE: releaseJobPayment(node, amount, jobId)
-    PE-->>CP: JobPaymentReleased event
+%% Job Assignment Phase
+    Note over CP,IT: 5. Job Assignment
+    CP->>JM: startAssignmentRound()
+    JM->>LM: validateLeader(msg.sender)
+    JM->>NM: getNodesInPool(poolId)
+    JM->>LM: getNodesWhoRevealed(epoch)
+    JM-->>CP: AssignmentRoundStarted event
 
-%% Rewards Distribution
-    RM->>EM: getCurrentEpoch()
-    RM->>RV: distributeReward(cp, rewardType)
-    RV-->>CP: RewardDistributed event
-    CP->>RV: claimRewards()
-    RV-->>CP: RewardsClaimed event
+%% Job Execution Phase
+    Note over CP,IT: 6. Job Execution
+    CP->>JM: confirmJob(jobId)
+    JM->>NM: validateNodeOwner(jobId, msg.sender)
+    JM-->>CP: JobConfirmed event
+    CP->>JM: completeJob(jobId)
+    JM-->>CP: JobCompleted event
+
+%% Payment & Rewards Phase
+    Note over CP,IT: 7. Payment & Rewards
+    CP->>JM: processPayment(jobId)
+    JM->>JE: releasePayment(from, to, amount)
+    JE-->>CP: PaymentReleased event
+
+    IM->>IT: distributeReward(cp, amount, "Secret revelation reward")
+    IT-->>CP: RewardDistributed event
 
 %% Penalties (if applicable)
-    PM->>SC: getStakedBalance(cp)
-    SC-->>PM: balance
-    PM->>SC: applyPenalty(cp, reason)
-    PM-->>CP: PenaltyApplied event
+    Note over CP,IT: 8. Penalties (if applicable)
+    IM->>IT: applyPenalty(cp, amount, reason)
+    IT->>NE: applyPenalty(cp, amount)
+    NE-->>CP: PenaltyApplied event

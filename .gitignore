@@ -2,7 +2,7 @@
 cache/
 out/
 
-# Ignores development broadcast logs
+# Ignores broadcast logs
 broadcast/
 
 # Dotenv file
@@ -12,3 +12,4 @@ broadcast/
 .idea/
 *.iml
 testnet.txt
+.DS_Store
