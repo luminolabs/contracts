@@ -55,13 +55,13 @@ contract DeploymentScript is Script {
 
         // 3. Deploy escrow contracts
         nodeEscrow = new NodeEscrow(
-            address(token),
-            address(accessManager)
+            address(accessManager),
+            address(token)
         );
 
         jobEscrow = new JobEscrow(
-            address(token),
-            address(accessManager)
+            address(accessManager),
+            address(token)
         );
 
         incentiveTreasury = new IncentiveTreasury(

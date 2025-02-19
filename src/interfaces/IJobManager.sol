@@ -12,7 +12,8 @@ interface IJobManager {
         uint256 assignedNode;
         JobStatus status;
         uint256 requiredPool;
-        mapping(string => string) args;
+        string args;
+        string base_model_name;  // TODO: Make configurable enum
         uint256 tokenCount;
         uint256 createdAt;
     }
@@ -36,7 +37,7 @@ interface IJobManager {
     event PaymentProcessed(uint256 indexed jobId, address indexed node, uint256 amount);
 
     // Job management functions
-    function submitJob(string calldata jobArgs, uint256 requiredPool) external returns (uint256);
+    function submitJob(string calldata jobArgs, string calldata base_model_name, uint256 requiredPool) external returns (uint256);
     function startAssignmentRound() external;
     function processPayment(uint256 jobId) external;
     function confirmJob(uint256 jobId) external;
@@ -46,4 +47,5 @@ interface IJobManager {
     function getUnconfirmedJobs(uint256 epoch) external view returns (uint256[] memory);
     function getAssignedNode(uint256 jobId) external view returns (uint256);
     function getNodeInactivityEpochs(uint256 nodeId) external view returns (uint256);
+    function getJobsDetailsByNode(uint256 nodeId) external view returns (uint256[] memory, string[] memory);
 }

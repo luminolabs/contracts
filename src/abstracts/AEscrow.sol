@@ -41,7 +41,7 @@ abstract contract AEscrow is IEscrow {
 
         token.transferFrom(msg.sender, address(this), amount);
         balances[msg.sender] += amount;
-        emit Deposited(msg.sender, amount, balances[msg.sender], "stake");
+        emit Deposited(msg.sender, amount, balances[msg.sender], getEscrowName());
     }
 
     /**

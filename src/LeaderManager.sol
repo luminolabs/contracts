@@ -79,6 +79,7 @@ contract LeaderManager is ILeaderManager {
      * @notice Elect the leader for the current epoch
      */
     function electLeader() external returns (uint256 leaderNodeId) {
+        // TODO: Make sure node revealed
         epochManager.validateEpochState(IEpochManager.State.ELECT);
         uint256 currentEpoch = epochManager.getCurrentEpoch();
         if (epochLeaders[currentEpoch] != 0) {

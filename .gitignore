@@ -8,6 +8,12 @@ broadcast/
 # Dotenv file
 .env
 
+# python
+__pycache__/
+
+# Temporary files
+node_data/
+
 # Other
 .idea/
 *.iml
