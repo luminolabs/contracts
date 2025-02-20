@@ -19,3 +19,16 @@ node_data/
 *.iml
 testnet.txt
 .DS_Store
+
+# Docs
+docs/
+
+.vscode
+.idea
+
+slither-results.sarif
+
+node_modules
+lcov.info
+
+repomix-output.txt
