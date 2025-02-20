@@ -24,7 +24,7 @@ contract AccessManagerTest is Test {
         vm.stopPrank();
     }
 
-    function testInitialState() public {
+    function testInitialState() public view {
         // Admin role should be granted to deployer
         assertTrue(accessManager.hasRole(LShared.ADMIN_ROLE, admin));
         
