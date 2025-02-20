@@ -1,291 +1,374 @@
-// // SPDX-License-Identifier: MIT
-// pragma solidity ^0.8.17;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
 
-// import "forge-std/Test.sol";
-// import "../src/IncentiveManager.sol";
-// import "../src/libraries/LShared.sol";
+import "forge-std/Test.sol";
+import "../src/IncentiveManager.sol";
+import "../src/EpochManager.sol";
+import "../src/LeaderManager.sol";
+import "../src/JobManager.sol";
+import "../src/JobEscrow.sol";
+import "../src/NodeManager.sol";
+import "../src/NodeEscrow.sol";
+import "../src/IncentiveTreasury.sol";
+import "../src/WhitelistManager.sol";
+import "../src/AccessManager.sol";
+import "../src/LuminoToken.sol";
+import "../src/libraries/LShared.sol";
 
-// // Mock contracts
-// contract MockEpochManager {
-//     uint256 private currentEpoch = 1;
+contract IncentiveManagerTest is Test {
+    IncentiveManager public incentiveManager;
+    EpochManager public epochManager;
+    LeaderManager public leaderManager;
+    JobManager public jobManager;
+    NodeManager public nodeManager;
+    NodeEscrow public nodeEscrow;
+    JobEscrow public jobEscrow;
+    IncentiveTreasury public treasury;
+    WhitelistManager public whitelistManager;
+    AccessManager public accessManager;
+    LuminoToken public token;
 
-//     function getCurrentEpoch() external view returns (uint256) {
-//         return currentEpoch;
-//     }
+    // Test addresses
+    address public admin = address(1);
+    address public operator = address(2);
+    address public cp1 = address(3);
+    address public cp2 = address(4);
+    address public jobSubmitter = address(5);
 
-//     function setCurrentEpoch(uint256 _epoch) external {
-//         currentEpoch = _epoch;
-//     }
-// }
+    // Constants
+    uint256 public constant INITIAL_BALANCE = 1000 ether;
+    uint256 public constant COMPUTE_RATING = 10;
+    uint256 public constant STAKE_AMOUNT = 100 ether;
+    uint256 public constant JOB_DEPOSIT = 10 ether;
+    string public constant MODEL_NAME = "llm_llama3_1_8b";
 
-// contract MockLeaderManager {
-//     uint256 private currentLeader;
-//     mapping(uint256 => uint256[]) private revealedNodes;
-//     bool private assignmentRoundStarted;
+    function setUp() public {
+        vm.startPrank(admin);
+        
+        // Deploy contracts
+        token = new LuminoToken();
+        accessManager = new AccessManager();
+        epochManager = new EpochManager();
+        nodeEscrow = new NodeEscrow(address(accessManager), address(token));
+        jobEscrow = new JobEscrow(address(accessManager), address(token));
+        whitelistManager = new WhitelistManager(address(accessManager));
+        treasury = new IncentiveTreasury(address(token), address(accessManager));
+        
+        nodeManager = new NodeManager(
+            address(nodeEscrow),
+            address(whitelistManager),
+            address(accessManager)
+        );
+        
+        leaderManager = new LeaderManager(
+            address(epochManager),
+            address(nodeManager),
+            address(nodeEscrow),
+            address(accessManager),
+            address(whitelistManager)
+        );
+        
+        jobManager = new JobManager(
+            address(nodeManager),
+            address(leaderManager),
+            address(epochManager),
+            address(jobEscrow),
+            address(accessManager)
+        );
+        
+        incentiveManager = new IncentiveManager(
+            address(epochManager),
+            address(leaderManager),
+            address(jobManager),
+            address(nodeManager),
+            address(nodeEscrow),
+            address(treasury)
+        );
 
-//     function setCurrentLeader(uint256 _leader) external {
-//         currentLeader = _leader;
-//     }
+        // Setup roles
+        accessManager.grantRole(LShared.CONTRACTS_ROLE, address(incentiveManager));
+        accessManager.grantRole(LShared.CONTRACTS_ROLE, address(treasury));
+        accessManager.grantRole(LShared.OPERATOR_ROLE, operator);
+        
+        // Whitelist CPs
+        whitelistManager.addCP(cp1);
+        whitelistManager.addCP(cp2);
 
-//     function getCurrentLeader() external view returns (uint256) {
-//         return currentLeader;
-//     }
+        // Fund accounts and treasury
+        token.transfer(cp1, INITIAL_BALANCE);
+        token.transfer(cp2, INITIAL_BALANCE);
+        token.transfer(jobSubmitter, INITIAL_BALANCE);
+        token.transfer(address(treasury), INITIAL_BALANCE * 10);
 
-//     function setNodesWhoRevealed(uint256 epoch, uint256[] calldata nodes) external {
-//         delete revealedNodes[epoch];
-//         for(uint256 i = 0; i < nodes.length; i++) {
-//             revealedNodes[epoch].push(nodes[i]);
-//         }
-//     }
+        vm.stopPrank();
 
-//     function getNodesWhoRevealed(uint256 epoch) external view returns (uint256[] memory) {
-//         return revealedNodes[epoch];
-//     }
-// }
+        // Setup nodes and approvals
+        _setupNode(cp1);
+        _setupNode(cp2);
+    }
 
-// contract MockJobManager {
-//     mapping(uint256 => bool) private roundStarted;
-//     mapping(uint256 => uint256[]) private unconfirmedJobs;
-//     mapping(uint256 => uint256) private assignedNodes;
+    function _setupNode(address cp) internal {
+        vm.startPrank(cp);
+        token.approve(address(nodeEscrow), STAKE_AMOUNT);
+        token.approve(address(treasury), INITIAL_BALANCE); // For penalties
+        nodeEscrow.deposit(STAKE_AMOUNT);
+        nodeManager.registerNode(COMPUTE_RATING);
+        vm.stopPrank();
+    }
 
-//     function setAssignmentRoundStarted(uint256 epoch, bool started) external {
-//         roundStarted[epoch] = started;
-//     }
+    function _setupEpochAndLeader() internal returns (uint256 leaderId) {
+        // Make sure we're at the start of an epoch
+        uint256 currentEpochStart = (block.timestamp / LShared.EPOCH_DURATION) * LShared.EPOCH_DURATION;
+        vm.warp(currentEpochStart);
+        
+        vm.startPrank(cp1);
+        bytes memory secret = bytes("secret");
+        bytes32 commitment = keccak256(secret);
+        leaderManager.submitCommitment(1, commitment);
+        
+        vm.warp(currentEpochStart + LShared.COMMIT_DURATION);
+        leaderManager.revealSecret(1, secret);
+        
+        vm.warp(currentEpochStart + LShared.COMMIT_DURATION + LShared.REVEAL_DURATION);
+        leaderId = leaderManager.electLeader();
+        
+        vm.stopPrank();
+        return leaderId;
+    }
 
-//     function wasAssignmentRoundStarted(uint256 epoch) external view returns (bool) {
-//         return roundStarted[epoch];
-//     }
+    function testSecretRevealReward() public {
+        // Start at a clean epoch boundary
+        vm.warp(LShared.EPOCH_DURATION);
+        
+        // Setup epoch and reveal secret
+        _setupEpochAndLeader();
+        
+        // Move to next epoch
+        vm.warp(block.timestamp + LShared.EPOCH_DURATION);
+        uint256 previousEpoch = epochManager.getCurrentEpoch() - 1;
+        
+        // Get initial balances
+        uint256 cp1BalanceBefore = token.balanceOf(cp1);
+        
+        // Process rewards
+        incentiveManager.processAll(previousEpoch);
+        
+        // Verify reward was distributed
+        assertEq(
+            token.balanceOf(cp1) - cp1BalanceBefore,
+            LShared.SECRET_REVEAL_REWARD,
+            "Secret reveal reward not distributed correctly"
+        );
+    }
 
-//     function setUnconfirmedJobs(uint256 epoch, uint256[] calldata jobs) external {
-//         delete unconfirmedJobs[epoch];
-//         for(uint256 i = 0; i < jobs.length; i++) {
-//             unconfirmedJobs[epoch].push(jobs[i]);
-//         }
-//     }
+    function testLeaderAssignmentReward() public {
+        // Start at a clean epoch boundary
+        vm.warp(LShared.EPOCH_DURATION);
+        
+        // Setup leader and job assignment
+        uint256 leaderId = _setupEpochAndLeader();
+        address leader = nodeManager.getNodeOwner(leaderId);
+        
+        // Move to execute phase
+        vm.warp(block.timestamp + LShared.ELECT_DURATION);
+        
+        // Setup and assign job
+        vm.startPrank(jobSubmitter);
+        token.approve(address(jobEscrow), JOB_DEPOSIT);
+        jobEscrow.deposit(JOB_DEPOSIT);
+        jobManager.submitJob("test job", MODEL_NAME, COMPUTE_RATING);
+        vm.stopPrank();
+        
+        vm.prank(leader);
+        jobManager.startAssignmentRound();
+        
+        // Move to next epoch
+        vm.warp(block.timestamp + LShared.EPOCH_DURATION);
+        uint256 previousEpoch = epochManager.getCurrentEpoch() - 1;
+        
+        // Get initial balance
+        uint256 leaderBalanceBefore = token.balanceOf(leader);
+        
+        // Process rewards
+        incentiveManager.processAll(previousEpoch);
+        
+        // Verify leader reward
+        assertEq(
+            token.balanceOf(leader) - leaderBalanceBefore,
+            LShared.LEADER_ASSIGNMENT_REWARD,
+            "Leader assignment reward not distributed correctly"
+        );
+    }
 
-//     function getUnconfirmedJobs(uint256 epoch) external view returns (uint256[] memory) {
-//         return unconfirmedJobs[epoch];
-//     }
+    function testMissedAssignmentPenalty() public {
+        // Start at a clean epoch boundary
+        vm.warp(LShared.EPOCH_DURATION);
+        
+        // Setup leader but don't start assignment round
+        uint256 leaderId = _setupEpochAndLeader();
+        address leader = nodeManager.getNodeOwner(leaderId);
+        
+        // Submit job to create assignment opportunity
+        vm.startPrank(jobSubmitter);
+        token.approve(address(jobEscrow), JOB_DEPOSIT);
+        jobEscrow.deposit(JOB_DEPOSIT);
+        jobManager.submitJob("test job", MODEL_NAME, COMPUTE_RATING);
+        vm.stopPrank();
+        
+        // Move to next epoch without starting assignment round
+        vm.warp(block.timestamp + LShared.EPOCH_DURATION);
+        uint256 previousEpoch = epochManager.getCurrentEpoch() - 1;
+        
+        // Get initial balance
+        uint256 leaderBalanceBefore = token.balanceOf(leader);
+        
+        // Process penalties
+        incentiveManager.processAll(previousEpoch);
+        
+        // Verify penalty was applied
+        assertEq(
+            leaderBalanceBefore - token.balanceOf(leader),
+            LShared.MISSED_ASSIGNMENT_PENALTY,
+            "Missed assignment penalty not applied correctly"
+        );
+    }
 
-//     function setAssignedNode(uint256 jobId, uint256 nodeId) external {
-//         assignedNodes[jobId] = nodeId;
-//     }
+    function testMissedConfirmationPenalty() public {
+        // Start at a clean epoch boundary
+        vm.warp(LShared.EPOCH_DURATION);
+        
+        // Setup leader and assign job
+        uint256 leaderId = _setupEpochAndLeader();
+        address leader = nodeManager.getNodeOwner(leaderId);
+        
+        vm.startPrank(jobSubmitter);
+        token.approve(address(jobEscrow), JOB_DEPOSIT);
+        jobEscrow.deposit(JOB_DEPOSIT);
+        jobManager.submitJob("test job", MODEL_NAME, COMPUTE_RATING);
+        vm.stopPrank();
+        
+        // Move to execute phase and assign job
+        vm.warp(block.timestamp + LShared.ELECT_DURATION);
+        vm.prank(leader);
+        jobManager.startAssignmentRound();
+        
+        // Move to next epoch without confirming job
+        vm.warp(block.timestamp + LShared.EPOCH_DURATION);
+        uint256 previousEpoch = epochManager.getCurrentEpoch() - 1;
+        
+        // Get assigned node's balance
+        uint256 assignedNodeId = jobManager.getAssignedNode(1);
+        address assignedNode = nodeManager.getNodeOwner(assignedNodeId);
+        uint256 nodeBalanceBefore = token.balanceOf(assignedNode);
+        
+        // Process penalties
+        incentiveManager.processAll(previousEpoch);
+        
+        // Verify penalty was applied
+        assertEq(
+            nodeBalanceBefore - token.balanceOf(assignedNode),
+            LShared.MISSED_CONFIRMATION_PENALTY,
+            "Missed confirmation penalty not applied correctly"
+        );
+    }
 
-//     function getAssignedNode(uint256 jobId) external view returns (uint256) {
-//         return assignedNodes[jobId];
-//     }
-// }
+    function testMaxPenaltiesSlashing() public {
+        // Start at a clean epoch boundary
+        vm.warp(LShared.EPOCH_DURATION);
+        
+        // Setup leader
+        uint256 leaderId = _setupEpochAndLeader();
+        address leader = nodeManager.getNodeOwner(leaderId);
+        
+        // Submit job to create assignment opportunities
+        vm.startPrank(jobSubmitter);
+        token.approve(address(jobEscrow), JOB_DEPOSIT);
+        jobEscrow.deposit(JOB_DEPOSIT);
+        jobManager.submitJob("test job", MODEL_NAME, COMPUTE_RATING);
+        vm.stopPrank();
+        
+        // Accumulate max penalties
+        for (uint256 i = 0; i < LShared.MAX_PENALTIES_BEFORE_SLASH; i++) {
+            vm.warp(block.timestamp + LShared.EPOCH_DURATION);
+            incentiveManager.processAll(epochManager.getCurrentEpoch() - 1);
+        }
+        
+        // Verify complete stake slashing
+        assertEq(
+            nodeEscrow.getBalance(leader), 
+            0,
+            "Stake not completely slashed after max penalties"
+        );
+    }
 
-// contract MockNodeManager {
-//     mapping(uint256 => address) private nodeOwners;
+    function testCannotProcessCurrentEpoch() public {
+        uint256 currentEpoch = epochManager.getCurrentEpoch();
+        vm.expectRevert("Cannot process current epoch");
+        incentiveManager.processAll(currentEpoch);
+    }
 
-//     function setNodeOwner(uint256 nodeId, address owner) external {
-//         nodeOwners[nodeId] = owner;
-//     }
+    function testCannotProcessEpochTwice() public {
+        // Setup and complete an epoch
+        _setupEpochAndLeader();
+        vm.warp(block.timestamp + LShared.EPOCH_DURATION);
+        uint256 previousEpoch = epochManager.getCurrentEpoch() - 1;
+        
+        // Process first time
+        incentiveManager.processAll(previousEpoch);
+        
+        // Try to process same epoch again
+        vm.expectRevert("Epoch already processed");
+        incentiveManager.processAll(previousEpoch);
+    }
 
-//     function getNodeOwner(uint256 nodeId) external view returns (address) {
-//         return nodeOwners[nodeId];
-//     }
-// }
-
-// contract MockNodeEscrow {
-//     mapping(address => uint256) private balances;
-
-//     function setBalance(address user, uint256 balance) external {
-//         balances[user] = balance;
-//     }
-
-//     function getBalance(address user) external view returns (uint256) {
-//         return balances[user];
-//     }
-
-//     function applyPenalty(address cp, uint256 amount) external {
-//         balances[cp] -= amount;
-//     }
-// }
-
-// contract MockIncentiveTreasury {
-//     event RewardDistributed(address indexed recipient, uint256 amount, string reason);
-//     event PenaltyApplied(address indexed offender, uint256 amount, string reason);
-
-//     function distributeReward(address recipient, uint256 amount, string calldata reason) external {
-//         emit RewardDistributed(recipient, amount, reason);
-//     }
-
-//     function applyPenalty(address offender, uint256 amount, string calldata reason) external {
-//         emit PenaltyApplied(offender, amount, reason);
-//     }
-// }
-
-// contract IncentiveManagerTest is Test {
-//     IncentiveManager public incentiveManager;
-//     MockEpochManager public epochManager;
-//     MockLeaderManager public leaderManager;
-//     MockJobManager public jobManager;
-//     MockNodeManager public nodeManager;
-//     MockNodeEscrow public nodeEscrow;
-//     MockIncentiveTreasury public treasury;
-
-//     // Test addresses
-//     address public leader = address(1);
-//     address public node1 = address(2);
-//     address public node2 = address(3);
-    
-//     function setUp() public {
-//         // Deploy mock contracts
-//         epochManager = new MockEpochManager();
-//         leaderManager = new MockLeaderManager();
-//         jobManager = new MockJobManager();
-//         nodeManager = new MockNodeManager();
-//         nodeEscrow = new MockNodeEscrow();
-//         treasury = new MockIncentiveTreasury();
-
-//         // Deploy IncentiveManager
-//         incentiveManager = new IncentiveManager(
-//             address(epochManager),
-//             address(leaderManager),
-//             address(jobManager),
-//             address(nodeManager),
-//             address(nodeEscrow),
-//             address(treasury)
-//         );
-
-//         // Set up initial state
-//         epochManager.setCurrentEpoch(2); // Allow processing of epoch 1
-//     }
-
-//     function testProcessAllBasicSuccess() public {
-//         // Setup epoch 1 state
-//         leaderManager.setCurrentLeader(1);
-//         nodeManager.setNodeOwner(1, leader);
-//         jobManager.setAssignmentRoundStarted(1, true);
-
-//         uint256[] memory revealedNodes = new uint256[](2);
-//         revealedNodes[0] = 1;
-//         revealedNodes[1] = 2;
-//         leaderManager.setNodesWhoRevealed(1, revealedNodes);
-
-//         nodeManager.setNodeOwner(1, node1);
-//         nodeManager.setNodeOwner(2, node2);
-
-//         // Process rewards and penalties
-//         incentiveManager.processAll(1);
-
-//         // Verify cannot process same epoch again
-//         vm.expectRevert("Epoch already processed");
-//         incentiveManager.processAll(1);
-//     }
-
-//     function testLeaderRewards() public {
-//         // Setup
-//         leaderManager.setCurrentLeader(1);
-//         nodeManager.setNodeOwner(1, leader);
-//         jobManager.setAssignmentRoundStarted(1, true);
-
-//         // Expect leader reward event
-//         vm.expectEmit(true, false, false, true);
-//         emit RewardDistributed(leader, LShared.LEADER_ASSIGNMENT_REWARD, "Leader assignment round completion");
-
-//         incentiveManager.processAll(1);
-//     }
-
-//     function testLeaderPenalties() public {
-//         // Setup leader who missed assignment round
-//         leaderManager.setCurrentLeader(1);
-//         nodeManager.setNodeOwner(1, leader);
-//         jobManager.setAssignmentRoundStarted(1, false);
-//         nodeEscrow.setBalance(leader, LShared.MISSED_ASSIGNMENT_PENALTY * 2);
-
-//         // Expect penalty event
-//         vm.expectEmit(true, false, false, true);
-//         emit PenaltyApplied(leader, LShared.MISSED_ASSIGNMENT_PENALTY, "Missed assignment round");
-
-//         incentiveManager.processAll(1);
-//     }
-
-//     function testNodeRevealRewards() public {
-//         // Setup nodes who revealed
-//         uint256[] memory revealedNodes = new uint256[](2);
-//         revealedNodes[0] = 1;
-//         revealedNodes[1] = 2;
-//         leaderManager.setNodesWhoRevealed(1, revealedNodes);
-
-//         nodeManager.setNodeOwner(1, node1);
-//         nodeManager.setNodeOwner(2, node2);
-
-//         // Expect reward events for both nodes
-//         vm.expectEmit(true, false, false, true);
-//         emit RewardDistributed(node1, LShared.SECRET_REVEAL_REWARD, "Secret revelation reward");
-//         vm.expectEmit(true, false, false, true);
-//         emit RewardDistributed(node2, LShared.SECRET_REVEAL_REWARD, "Secret revelation reward");
-
-//         incentiveManager.processAll(1);
-//     }
-
-//     function testMissedConfirmationPenalties() public {
-//         // Setup unconfirmed jobs
-//         uint256[] memory unconfirmedJobs = new uint256[](2);
-//         unconfirmedJobs[0] = 1;
-//         unconfirmedJobs[1] = 2;
-//         jobManager.setUnconfirmedJobs(1, unconfirmedJobs);
-
-//         // Setup job assignments
-//         jobManager.setAssignedNode(1, 1); // Job 1 assigned to Node 1
-//         jobManager.setAssignedNode(2, 2); // Job 2 assigned to Node 2
-//         nodeManager.setNodeOwner(1, node1);
-//         nodeManager.setNodeOwner(2, node2);
-
-//         // Set balances for penalties
-//         nodeEscrow.setBalance(node1, LShared.MISSED_CONFIRMATION_PENALTY * 2);
-//         nodeEscrow.setBalance(node2, LShared.MISSED_CONFIRMATION_PENALTY * 2);
-
-//         // Expect penalty events
-//         vm.expectEmit(true, false, false, true);
-//         emit PenaltyApplied(node1, LShared.MISSED_CONFIRMATION_PENALTY, "Missed job confirmation");
-//         vm.expectEmit(true, false, false, true);
-//         emit PenaltyApplied(node2, LShared.MISSED_CONFIRMATION_PENALTY, "Missed job confirmation");
-
-//         incentiveManager.processAll(1);
-//     }
-
-//     function testSlashingAfterMaxPenalties() public {
-//         // Setup node with many penalties
-//         leaderManager.setCurrentLeader(1);
-//         nodeManager.setNodeOwner(1, leader);
-//         jobManager.setAssignmentRoundStarted(1, false);
-//         nodeEscrow.setBalance(leader, 1000 ether);
-
-//         // Apply penalties until slashing
-//         for(uint256 i = 1; i <= LShared.MAX_PENALTIES_BEFORE_SLASH; i++) {
-//             incentiveManager.processAll(i);
-//             epochManager.setCurrentEpoch(i + 2); // Allow processing next epoch
-//         }
-
-//         // Verify leader was slashed (all stake taken)
-//         assertEq(nodeEscrow.getBalance(leader), 0);
-//     }
-
-//     function testCannotProcessCurrentEpoch() public {
-//         uint256 currentEpoch = epochManager.getCurrentEpoch();
-//         vm.expectRevert("Cannot process current epoch");
-//         incentiveManager.processAll(currentEpoch);
-//     }
-
-//     function testCannotProcessFutureEpoch() public {
-//         uint256 currentEpoch = epochManager.getCurrentEpoch();
-//         vm.expectRevert("Cannot process current epoch");
-//         incentiveManager.processAll(currentEpoch + 1);
-//     }
-
-//     function testDisputerReward() public {
-//         // Setup basic state
-//         leaderManager.setCurrentLeader(1);
-//         nodeManager.setNodeOwner(1, leader);
-
-//         // Expect disputer reward
-//         vm.expectEmit(true, false, false, true);
-//         emit RewardDistributed(address(this), LShared.DISPUTE_REWARD, "Dispute completion reward");
-
-//         incentiveManager.processAll(1);
-//     }
-// }
+    function testMultipleNodesRevealReward() public {
+        // Start at a clean epoch boundary
+        vm.warp(LShared.EPOCH_DURATION);
+        
+        // Setup first node
+        vm.startPrank(cp1);
+        bytes memory secret1 = bytes("secret1");
+        bytes32 commitment1 = keccak256(secret1);
+        leaderManager.submitCommitment(1, commitment1);
+        vm.stopPrank();
+        
+        // Setup second node
+        vm.startPrank(cp2);
+        bytes memory secret2 = bytes("secret2");
+        bytes32 commitment2 = keccak256(secret2);
+        leaderManager.submitCommitment(2, commitment2);
+        vm.stopPrank();
+        
+        // Move to reveal phase
+        vm.warp(block.timestamp + LShared.COMMIT_DURATION);
+        
+        // Both nodes reveal
+        vm.prank(cp1);
+        leaderManager.revealSecret(1, secret1);
+        vm.prank(cp2);
+        leaderManager.revealSecret(2, secret2);
+        
+        // Complete epoch
+        vm.warp(block.timestamp + LShared.EPOCH_DURATION);
+        uint256 previousEpoch = epochManager.getCurrentEpoch() - 1;
+        
+        // Record initial balances
+        uint256 cp1BalanceBefore = token.balanceOf(cp1);
+        uint256 cp2BalanceBefore = token.balanceOf(cp2);
+        
+        // Process rewards
+        incentiveManager.processAll(previousEpoch);
+        
+        // Verify both nodes received reveal reward
+        assertEq(
+            token.balanceOf(cp1) - cp1BalanceBefore,
+            LShared.SECRET_REVEAL_REWARD,
+            "First node did not receive reveal reward"
+        );
+        assertEq(
+            token.balanceOf(cp2) - cp2BalanceBefore,
+            LShared.SECRET_REVEAL_REWARD,
+            "Second node did not receive reveal reward"
+        );
+    }
+}
