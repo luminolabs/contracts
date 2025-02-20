@@ -19,8 +19,8 @@ contract WhitelistManager is IWhitelistManager {
     error CooldownActive(address cp, uint256 remainingTime);
     error NotWhitelisted(address cp);
 
-    constructor(address _accessController) {
-        accessManager = IAccessManager(_accessController);
+    constructor(address _accessManager) {
+        accessManager = IAccessManager(_accessManager);
     }
 
     /**

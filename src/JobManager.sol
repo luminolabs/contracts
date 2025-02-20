@@ -15,7 +15,7 @@ contract JobManager is IJobManager {
     ILeaderManager private immutable leaderManager;
     IEpochManager private immutable epochManager;
     IJobEscrow private immutable jobEscrow;
-    IAccessManager private immutable accessController;
+    IAccessManager private immutable accessManager;
 
     // State variables
     uint256 private jobCounter;
@@ -40,17 +40,18 @@ contract JobManager is IJobManager {
         address _leaderManager,
         address _epochManager,
         address _jobEscrow,
-        address _accessController
+        address _accessManager
     ) {
         nodeManager = INodeManager(_nodeManager);
         leaderManager = ILeaderManager(_leaderManager);
         epochManager = IEpochManager(_epochManager);
         jobEscrow = IJobEscrow(_jobEscrow);
-        accessController = IAccessManager(_accessController);
+        accessManager = IAccessManager(_accessManager);
     }
 
     function submitJob(
         string calldata jobArgs,
+        string calldata base_model_name,
         uint256 requiredPool
     ) external returns (uint256) {
         jobEscrow.requireBalance(msg.sender, LShared.MIN_BALANCE_TO_SUBMIT);
@@ -65,7 +66,8 @@ contract JobManager is IJobManager {
         job.assignedNode = 0;
         job.status = JobStatus.NEW;
         job.requiredPool = requiredPool;
-        job.args["base_model_name"] = jobArgs;
+        job.args = jobArgs;
+        job.base_model_name = base_model_name;
         job.tokenCount = 0;
         job.createdAt = block.timestamp;
 
@@ -143,6 +145,7 @@ contract JobManager is IJobManager {
      * @notice Confirm an assigned job
      */
     function confirmJob(uint256 jobId) external {
+        epochManager.validateEpochState(IEpochManager.State.CONFIRM);
         Job storage job = jobs[jobId];
         if (job.status != JobStatus.ASSIGNED) {
             revert InvalidJobStatus(jobId, job.status, JobStatus.ASSIGNED);
@@ -271,12 +274,26 @@ contract JobManager is IJobManager {
         return epochLimit;
     }
 
-    // Internal functions
+    /**
+     * @notice Returns a list of job IDs for a given node, and their corresponding arguments in json format
+     */
+    function getJobsDetailsByNode(uint256 nodeId) external view returns (uint256[] memory, string[] memory) {
+        uint256[] memory jobIds = nodeAssignments[nodeId];
+        string[] memory jobArgs = new string[](jobIds.length);
 
+        for (uint256 i = 0; i < jobIds.length; i++) {
+            jobIds[i] = jobs[jobIds[i]].id;
+            jobArgs[i] = jobs[jobIds[i]].args;
+        }
+
+        return (jobIds, jobArgs);
+    }
+
+    // Internal functions
 
     function calculateJobPayment(Job storage job) internal view returns (uint256) {
         uint256 modelFeePerMillionTokens = 0;
-        string memory model_name = job.args["base_model_name"];
+        string memory model_name = job.base_model_name;
         if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_llama3_2_1b"))) {
             modelFeePerMillionTokens = 1;
         } else if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_llama3_1_8b"))) {

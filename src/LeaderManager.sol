@@ -27,13 +27,13 @@ contract LeaderManager is ILeaderManager {
         address _epochManager,
         address _nodeManager,
         address _stakeEscrow,
-        address _accessController,
+        address _accessManager,
         address _whitelistManager
     ) {
         epochManager = IEpochManager(_epochManager);
         nodeManager = INodeManager(_nodeManager);
         stakeEscrow = INodeEscrow(_stakeEscrow);
-        accessManager = IAccessManager(_accessController);
+        accessManager = IAccessManager(_accessManager);
         whitelistManager = IWhitelistManager(_whitelistManager);
     }
 
@@ -79,6 +79,7 @@ contract LeaderManager is ILeaderManager {
      * @notice Elect the leader for the current epoch
      */
     function electLeader() external returns (uint256 leaderNodeId) {
+        // TODO: Make sure node revealed
         epochManager.validateEpochState(IEpochManager.State.ELECT);
         uint256 currentEpoch = epochManager.getCurrentEpoch();
         if (epochLeaders[currentEpoch] != 0) {

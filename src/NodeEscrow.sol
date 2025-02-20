@@ -9,7 +9,7 @@ import {INodeEscrow} from "./interfaces/INodeEscrow.sol";
 import {LShared} from "./libraries/LShared.sol";
 
 contract NodeEscrow is AEscrow, INodeEscrow {
-    constructor (address _accessController, address _token) AEscrow(_accessController, _token) {}
+    constructor (address _accessManager, address _token) AEscrow(_accessManager, _token) {}
 
     /**
      * @notice Apply a penalty to a CP's stake
