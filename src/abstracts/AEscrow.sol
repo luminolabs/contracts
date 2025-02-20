@@ -96,8 +96,8 @@ abstract contract AEscrow is IEscrow {
         if (balances[msg.sender] < amount) {
             revert InsufficientBalance(msg.sender, amount, balances[msg.sender]);
         }
-        if (address(this).balance < amount) {
-            revert InsufficientContractBalance(amount, address(this).balance);
+        if (token.balanceOf(address(this)) < amount) {
+            revert InsufficientContractBalance(amount, token.balanceOf(address(this)));
         }
 
         balances[msg.sender] -= amount;
