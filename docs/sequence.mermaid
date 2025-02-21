@@ -1,75 +1,80 @@
 sequenceDiagram
     participant CP as Computing Provider
+    participant AM as AccessManager
     participant WM as WhitelistManager
-    participant NM as NodeManager
     participant NE as NodeEscrow
+    participant NM as NodeManager
     participant EM as EpochManager
     participant LM as LeaderManager
     participant JM as JobManager
     participant JE as JobEscrow
     participant IM as IncentiveManager
-    participant IT as IncentiveTreasury
+    participant LT as LuminoToken
 
-%% Onboarding Phase
-    Note over CP,IT: 1. Onboarding
-    CP->>WM: addCP()
-    WM-->>CP: CPAdded event
-    CP->>NE: deposit(stake)
-    NE-->>CP: Deposited event
+    Note over CP: Node Registration Phase
+    CP->>WM: requireWhitelisted()
+    CP->>LT: approve(nodeEscrow, amount)
+    CP->>NE: deposit(stakeAmount)
     CP->>NM: registerNode(computeRating)
+    NM->>NE: requireBalance(cp, stakeAmount)
     NM->>WM: requireWhitelisted(cp)
-    NM->>NE: requireBalance(cp, stakeRequired)
-    NM-->>CP: NodeRegistered event
 
-%% Epoch Commitment Phase
-    Note over CP,IT: 2. Epoch Commitment
-    CP->>EM: getCurrentEpoch()
-    EM-->>CP: epoch
+    Note over CP: Epoch Commit Phase
+    CP->>EM: getEpochState()
     CP->>LM: submitCommitment(nodeId, commitment)
     LM->>EM: validateEpochState(COMMIT)
-    LM->>NM: validateNodeOwner(nodeId, msg.sender)
-    LM-->>CP: CommitSubmitted event
+    LM->>NM: validateNodeOwner(nodeId, sender)
+    LM->>WM: requireWhitelisted(cp)
+    LM->>NE: requireBalance(cp, stake)
 
-%% Secret Reveal Phase
-    Note over CP,IT: 3. Secret Reveal
+    Note over CP: Epoch Reveal Phase
+    CP->>EM: getEpochState()
     CP->>LM: revealSecret(nodeId, secret)
     LM->>EM: validateEpochState(REVEAL)
-    LM->>NM: validateNodeOwner(nodeId, msg.sender)
-    LM-->>CP: SecretRevealed event
+    LM->>NM: validateNodeOwner(nodeId, sender)
 
-%% Leader Election Phase
-    Note over CP,IT: 4. Leader Election
+    Note over CP: Epoch Elect Phase
+    CP->>EM: getEpochState()
     CP->>LM: electLeader()
     LM->>EM: validateEpochState(ELECT)
-    LM-->>CP: LeaderElected event
 
-%% Job Assignment Phase
-    Note over CP,IT: 5. Job Assignment
+    Note over CP: Epoch Execute Phase
+    CP->>EM: getEpochState()
+    CP->>LM: validateLeader(caller)
     CP->>JM: startAssignmentRound()
-    JM->>LM: validateLeader(msg.sender)
+    JM->>EM: validateEpochState(EXECUTE)
+    JM->>LM: validateLeader(caller)
+    JM->>LM: getFinalRandomValue(epoch)
     JM->>NM: getNodesInPool(poolId)
-    JM->>LM: getNodesWhoRevealed(epoch)
-    JM-->>CP: AssignmentRoundStarted event
 
-%% Job Execution Phase
-    Note over CP,IT: 6. Job Execution
+    Note over CP: Epoch Confirm Phase
+    CP->>EM: getEpochState()
     CP->>JM: confirmJob(jobId)
-    JM->>NM: validateNodeOwner(jobId, msg.sender)
-    JM-->>CP: JobConfirmed event
+    JM->>EM: validateEpochState(CONFIRM)
+    JM->>NM: validateNodeOwner(nodeId, caller)
     CP->>JM: completeJob(jobId)
-    JM-->>CP: JobCompleted event
+    JM->>NM: validateNodeOwner(nodeId, caller)
 
-%% Payment & Rewards Phase
-    Note over CP,IT: 7. Payment & Rewards
-    CP->>JM: processPayment(jobId)
+    Note over CP: Epoch Dispute Phase
+    CP->>EM: getEpochState()
+    CP->>IM: processAll()
+    IM->>JM: wasAssignmentRoundStarted(epoch)
+    IM->>LM: getCurrentLeader()
+    IM->>NM: getNodeOwner(nodeId)
+    IM->>JM: getUnconfirmedJobs(epoch)
+    IM->>NE: applyPenalty(cp, amount, reason)
+    IM->>NE: applyReward(cp, amount, reason)
+
+    Note over CP: Job Processing
+    CP->>JE: deposit(amount)
+    CP->>JM: submitJob(args, model, pool)
+    JE->>LT: transferFrom(from, to, amount)
     JM->>JE: releasePayment(from, to, amount)
-    JE-->>CP: PaymentReleased event
 
-    IM->>IT: distributeReward(cp, amount, "Secret revelation reward")
-    IT-->>CP: RewardDistributed event
-
-%% Penalties (if applicable)
-    Note over CP,IT: 8. Penalties (if applicable)
-    IM->>IT: applyPenalty(cp, amount, reason)
-    IT->>NE: applyPenalty(cp, amount)
-    NE-->>CP: PenaltyApplied event
+    Note over CP: Node Management
+    CP->>NM: unregisterNode(nodeId)
+    NM->>NE: requireBalance(cp, stake)
+    CP->>NE: requestWithdraw(amount)
+    CP->>NE: cancelWithdraw()
+    CP->>NE: withdraw()
+    NE->>LT: transfer(to, amount)
