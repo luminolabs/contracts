@@ -334,96 +334,19 @@ class LuminoSDK:
     # Event monitoring methods
     def setup_event_filters(self) -> None:
         """Set up filters for all relevant contract events"""
-        current_block = self.w3.eth.block_number
-
-        # AccessManager events
-        self._create_event_filters(self.access_manager, [
-            'RoleGranted',
-            'RoleRevoked'
-        ], current_block)
-
-        # NodeManager events
-        self._create_event_filters(self.node_manager, [
-            'NodeRegistered',
-            'NodeUnregistered',
-            'NodeUpdated',
-            'StakeValidated',
-            'StakeRequirementUpdated'
-        ], current_block)
-
-        # LeaderManager events
-        self._create_event_filters(self.leader_manager, [
-            'CommitSubmitted',
-            'SecretRevealed',
-            'LeaderElected'
-        ], current_block)
-
-        # JobManager events
-        self._create_event_filters(self.job_manager, [
-            'JobSubmitted',
-            'JobStatusUpdated',
-            'JobAssigned',
-            'AssignmentRoundStarted',
-            'JobConfirmed',
-            'JobCompleted',
-            'JobRejected',
-            'PaymentProcessed'
-        ], current_block)
-
-        # NodeEscrow events
-        self._create_event_filters(self.node_escrow, [
-            'Deposited',
-            'WithdrawRequested',
-            'WithdrawCancelled',
-            'Withdrawn',
-            'PenaltyApplied',
-            'SlashApplied',
-            'RewardApplied'
-        ], current_block)
-
-        # JobEscrow events
-        self._create_event_filters(self.job_escrow, [
-            'Deposited',
-            'WithdrawRequested',
-            'WithdrawCancelled',
-            'Withdrawn',
-            'PaymentReleased'
-        ], current_block)
-
-        # JobEscrow events
-        self._create_event_filters(self.job_escrow, [
-            'Deposited',
-            'WithdrawRequested',
-            'WithdrawCancelled',
-            'Withdrawn',
-            'PaymentReleased'
-        ], current_block)
-
-        # WhitelistManager events
-        self._create_event_filters(self.whitelist_manager, [
-            'CPAdded',
-            'CPRemoved'
-        ], current_block)
-
-        # LuminoToken events (ERC20)
-        self._create_event_filters(self.token, [
-            'Transfer',
-            'Approval'
-        ], current_block)
-
-        # IncentiveManager events
-        self._create_event_filters(self.incentive_manager, [
-            'LeaderRewardApplied',
-            'JobAvailabilityRewardApplied',
-            'DisputerRewardApplied',
-            'LeaderNotExecutedPenaltyApplied',
-            'JobNotConfirmedPenaltyApplied'
-        ], current_block)
-
-    def _create_event_filters(self, contract: Contract, event_names: List[str], from_block: int) -> None:
-        """Create filters for multiple events from a contract"""
-        for event_name in event_names:
-            self.event_handler.create_event_filter(contract, event_name, from_block)
+        contracts = {
+            'AccessManager': self.access_manager,
+            'WhitelistManager': self.whitelist_manager,
+            'LuminoToken': self.token,
+            'IncentiveManager': self.incentive_manager,
+            'NodeManager': self.node_manager,
+            'NodeEscrow': self.node_escrow,
+            'LeaderManager': self.leader_manager,
+            'JobManager': self.job_manager,
+            'JobEscrow': self.job_escrow
+        }
+        from_block = self.w3.eth.block_number
+        self.event_handler.setup_event_filters(contracts, from_block)
 
     def process_events(self) -> None:
         """Process any new events from all filters"""

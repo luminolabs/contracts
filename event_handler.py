@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 from web3 import Web3
 from web3.contract import Contract
@@ -12,12 +12,93 @@ class EventHandler:
         self.logger = logger
         self.event_filters: Dict[Tuple[str, str], any] = {}  # (contract_address, event_name) -> filter
 
+        # Define contract event mappings
+        self.contract_events = {
+            'AccessManager': [
+                'RoleGranted',
+                'RoleRevoked'
+            ],
+            'NodeManager': [
+                'NodeRegistered',
+                'NodeUnregistered',
+                'NodeUpdated',
+                'StakeValidated',
+                'StakeRequirementUpdated'
+            ],
+            'LeaderManager': [
+                'CommitSubmitted',
+                'SecretRevealed',
+                'LeaderElected'
+            ],
+            'JobManager': [
+                'JobSubmitted',
+                'JobStatusUpdated',
+                'JobAssigned',
+                'AssignmentRoundStarted',
+                'JobConfirmed',
+                'JobCompleted',
+                'JobRejected',
+                'PaymentProcessed'
+            ],
+            'NodeEscrow': [
+                'Deposited',
+                'WithdrawRequested',
+                'WithdrawCancelled',
+                'Withdrawn',
+                'PenaltyApplied',
+                'SlashApplied',
+                'RewardApplied'
+            ],
+            'JobEscrow': [
+                'Deposited',
+                'WithdrawRequested',
+                'WithdrawCancelled',
+                'Withdrawn',
+                'PaymentReleased'
+            ],
+            'WhitelistManager': [
+                'CPAdded',
+                'CPRemoved'
+            ],
+            'LuminoToken': [
+                'Transfer',
+                'Approval'
+            ],
+            'IncentiveManager': [
+                'LeaderRewardApplied',
+                'JobAvailabilityRewardApplied',
+                'DisputerRewardApplied',
+                'LeaderNotExecutedPenaltyApplied',
+                'JobNotConfirmedPenaltyApplied'
+            ]
+        }
+
+    def setup_event_filters(self, contracts: Dict[str, Contract], from_block: int) -> None:
+        """Set up filters for all contract events
+
+        Args:
+            contracts: Dictionary mapping contract names to Contract objects
+            from_block: Block number to start filtering from
+        """
+        for contract_name, contract in contracts.items():
+            if contract_name in self.contract_events:
+                self._create_event_filters(
+                    contract,
+                    self.contract_events[contract_name],
+                    from_block
+                )
+
     def create_event_filter(self, contract: Contract, event_name: str, from_block: int) -> None:
         """Create a new event filter for a specific contract event"""
         event = getattr(contract.events, event_name)
         event_filter = event.create_filter(from_block=from_block)
         self.event_filters[(contract.address, event_name)] = event_filter
         self.logger.info(f"Created filter for {event_name} events from block {from_block}")
+
+    def _create_event_filters(self, contract: Contract, event_names: List[str], from_block: int) -> None:
+        """Create filters for multiple events from a contract"""
+        for event_name in event_names:
+            self.create_event_filter(contract, event_name, from_block)
 
     def process_events(self) -> None:
         """Process all pending events from all filters"""
