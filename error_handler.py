@@ -1,9 +1,5 @@
-import logging
-from typing import Dict, Tuple
-
 from eth_abi import decode
 from web3 import Web3
-from web3.contract import Contract
 from web3.exceptions import ContractLogicError
 
 
