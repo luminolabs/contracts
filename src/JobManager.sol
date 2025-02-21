@@ -85,9 +85,11 @@ contract JobManager is IJobManager {
         epochManager.validateEpochState(IEpochManager.State.EXECUTE);
         leaderManager.validateLeader(msg.sender);
 
+        assignmentRoundStarted[epochManager.getCurrentEpoch()] = true;
+
         uint256[] memory newJobs = jobsByStatus[JobStatus.NEW];
         if (newJobs.length == 0) {
-            revert NoNewJobs();
+            return;
         }
 
         bytes32 randomSeed = leaderManager.getFinalRandomValue(epochManager.getCurrentEpoch());
@@ -201,6 +203,10 @@ contract JobManager is IJobManager {
     function getUnconfirmedJobs(uint256 epoch) external view returns (uint256[] memory) {
         uint256[] memory assignedJobs = assignedJobsByEpoch[epoch];
         uint256[] memory confirmedJobs = jobsByStatus[JobStatus.CONFIRMED];
+
+        if (assignedJobs.length == 0) {
+            return new uint256[](0);
+        }
 
         // First, count unconfirmed jobs
         uint256 unconfirmedCount = 0;

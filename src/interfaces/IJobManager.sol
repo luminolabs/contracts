@@ -24,7 +24,6 @@ interface IJobManager {
     error JobAlreadyProcessed(uint256 jobId);
     error JobNotComplete(uint256 jobId);
     error InvalidModelName(string modelName);
-    error NoNewJobs();
 
     // Events
     event JobSubmitted(uint256 indexed jobId, address indexed submitter, uint256 requiredPool);

@@ -7,10 +7,10 @@ interface IIncentiveManager {
 
     // Events
     event LeaderRewardApplied(uint256 indexed epoch, address cp, uint256 amount);
-    event NodeRewardApplied(uint256 indexed epoch, uint256[] indexed nodeIds, uint256 amount);
+    event JobAvailabilityRewardApplied(uint256 indexed epoch, uint256 indexed nodeIds, uint256 amount);
     event DisputerRewardApplied(uint256 indexed epoch, address cp, uint256 amount);
-    event LeaderPenaltyApplied(uint256 indexed epoch, address cp, uint256 amount);
-    event NodePenaltyApplied(uint256 indexed epoch, uint256[] indexed jobs, uint256 amount);
+    event LeaderNotExecutedPenaltyApplied(uint256 indexed epoch, address cp, uint256 amount);
+    event JobNotConfirmedPenaltyApplied(uint256 indexed epoch, uint256 indexed job, uint256 amount);
 
 
     // Incentive manager functions

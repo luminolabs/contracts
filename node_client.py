@@ -124,10 +124,6 @@ class LuminoErrorHandler:
                 "params": ["string"],
                 "format": lambda args: f"Invalid model name: {args[0]}"
             },
-            "NoNewJobs": {
-                "params": [],
-                "format": lambda args: "No new jobs available for assignment"
-            },
 
             # LeaderManager errors
             "NoCommitmentFound": {
@@ -470,10 +466,10 @@ class LuminoNode:
         # IncentiveManager events
         self._create_event_filters(self.incentive_manager, [
             'LeaderRewardApplied',
-            'NodeRewardApplied',
+            'JobAvailabilityRewardApplied',
             'DisputerRewardApplied',
-            'LeaderPenaltyApplied',
-            'NodePenaltyApplied'
+            'LeaderNotExecutedPenaltyApplied',
+            'JobNotConfirmedPenaltyApplied'
         ], current_block)
 
     def _create_event_filters(self, contract: Contract, event_names: List[str], from_block: int) -> None:

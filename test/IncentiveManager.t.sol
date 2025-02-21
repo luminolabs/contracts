@@ -156,7 +156,7 @@ contract IncentiveManagerTest is Test {
         // Verify reward was distributed
         assertEq(
             token.balanceOf(cp1) - cp1BalanceBefore,
-            LShared.SECRET_REVEAL_REWARD,
+            LShared.JOB_AVAILABILITY_REWARD,
             "Secret reveal reward not distributed correctly"
         );
     }
@@ -195,7 +195,7 @@ contract IncentiveManagerTest is Test {
         // Verify leader reward
         assertEq(
             token.balanceOf(leader) - leaderBalanceBefore,
-            LShared.LEADER_ASSIGNMENT_REWARD,
+            LShared.LEADER_REWARD,
             "Leader assignment reward not distributed correctly"
         );
     }
@@ -228,7 +228,7 @@ contract IncentiveManagerTest is Test {
         // Verify penalty was applied
         assertEq(
             leaderBalanceBefore - token.balanceOf(leader),
-            LShared.MISSED_ASSIGNMENT_PENALTY,
+            LShared.LEADER_NOT_EXECUTED_PENALTY,
             "Missed assignment penalty not applied correctly"
         );
     }
@@ -267,7 +267,7 @@ contract IncentiveManagerTest is Test {
         // Verify penalty was applied
         assertEq(
             nodeBalanceBefore - token.balanceOf(assignedNode),
-            LShared.MISSED_CONFIRMATION_PENALTY,
+            LShared.JOB_NOT_CONFIRMED_PENALTY,
             "Missed confirmation penalty not applied correctly"
         );
     }
@@ -362,12 +362,12 @@ contract IncentiveManagerTest is Test {
         // Verify both nodes received reveal reward
         assertEq(
             token.balanceOf(cp1) - cp1BalanceBefore,
-            LShared.SECRET_REVEAL_REWARD,
+            LShared.JOB_AVAILABILITY_REWARD,
             "First node did not receive reveal reward"
         );
         assertEq(
             token.balanceOf(cp2) - cp2BalanceBefore,
-            LShared.SECRET_REVEAL_REWARD,
+            LShared.JOB_AVAILABILITY_REWARD,
             "Second node did not receive reveal reward"
         );
     }

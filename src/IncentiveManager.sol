@@ -60,12 +60,12 @@ contract IncentiveManager is IIncentiveManager {
         if (!leaderRewardClaimed[epoch] && jobManager.wasAssignmentRoundStarted(epoch)) {
             nodeEscrow.applyReward(
                 leader,
-                LShared.LEADER_ASSIGNMENT_REWARD,
+                LShared.LEADER_REWARD,
                 "Leader assignment round completion"
             );
             leaderRewardClaimed[epoch] = true;
+            emit LeaderRewardApplied(epoch, leader, LShared.LEADER_REWARD);
         }
-        emit LeaderRewardApplied(epoch, leader, LShared.LEADER_ASSIGNMENT_REWARD);
 
         // Reward nodes that revealed secrets
         uint256[] memory revealedNodes = leaderManager.getNodesWhoRevealed(epoch);
@@ -74,24 +74,24 @@ contract IncentiveManager is IIncentiveManager {
                 address nodeOwner = nodeManager.getNodeOwner(revealedNodes[i]);
                 nodeEscrow.applyReward(
                     nodeOwner,
-                    LShared.SECRET_REVEAL_REWARD,
-                    "Secret revelation reward"
+                    LShared.JOB_AVAILABILITY_REWARD,
+                    "Job availability reward"
                 );
                 nodeRewardsClaimed[epoch][revealedNodes[i]] = true;
+                emit JobAvailabilityRewardApplied(epoch, revealedNodes[i], LShared.JOB_AVAILABILITY_REWARD);
             }
         }
-        emit NodeRewardApplied(epoch, revealedNodes, LShared.SECRET_REVEAL_REWARD);
 
         // Reward disputer
         if (!disputerRewardClaimed[epoch]) {
             nodeEscrow.applyReward(
                 msg.sender,
-                LShared.DISPUTE_REWARD,
-                "Dispute completion reward"
+                LShared.DISPUTER_REWARD,
+                "Disputer reward"
             );
             disputerRewardClaimed[epoch] = true;
+            emit DisputerRewardApplied(epoch, msg.sender, LShared.DISPUTER_REWARD);
         }
-        emit DisputerRewardApplied(epoch, msg.sender, LShared.DISPUTE_REWARD);
     }
 
     function disputeAll(uint256 epoch) internal {
@@ -100,14 +100,14 @@ contract IncentiveManager is IIncentiveManager {
         if (!jobManager.wasAssignmentRoundStarted(epoch)) {
             nodeEscrow.applyPenalty(
                 leader,
-                LShared.MISSED_ASSIGNMENT_PENALTY,
-                "Missed assignment round"
+                LShared.LEADER_NOT_EXECUTED_PENALTY,
+                "Leader didn't execute assignments"
             );
             if (incrementPenalty(leader)) {
                 slashCP(leader, "Exceeded maximum penalties");
             }
+            emit LeaderNotExecutedPenaltyApplied(epoch, leader, LShared.LEADER_NOT_EXECUTED_PENALTY);
         }
-        emit LeaderPenaltyApplied(epoch, leader, LShared.MISSED_ASSIGNMENT_PENALTY);
 
         // Penalize nodes that didn't confirm assigned jobs
         uint256[] memory unconfirmedJobs = jobManager.getUnconfirmedJobs(epoch);
@@ -115,14 +115,14 @@ contract IncentiveManager is IIncentiveManager {
             address nodeOwner = nodeManager.getNodeOwner(jobManager.getAssignedNode(unconfirmedJobs[i]));
             nodeEscrow.applyPenalty(
                 nodeOwner,
-                LShared.MISSED_CONFIRMATION_PENALTY,
-                "Missed job confirmation"
+                LShared.JOB_NOT_CONFIRMED_PENALTY,
+                "Node didn't confirm job"
             );
             if (incrementPenalty(nodeOwner)) {
                 slashCP(nodeOwner, "Exceeded maximum penalties");
             }
+            emit JobNotConfirmedPenaltyApplied(epoch, unconfirmedJobs[i], LShared.JOB_NOT_CONFIRMED_PENALTY);
         }
-        emit NodePenaltyApplied(epoch, unconfirmedJobs, LShared.MISSED_CONFIRMATION_PENALTY);
     }
 
     function validate(uint256 epoch) internal {

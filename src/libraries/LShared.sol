@@ -17,11 +17,11 @@ library LShared {
     uint256 public constant EPOCH_DURATION = COMMIT_DURATION + REVEAL_DURATION + ELECT_DURATION + EXECUTE_DURATION + CONFIRM_DURATION + DISPUTE_DURATION;
 
     // IncentiveManager Constants
-    uint256 public constant LEADER_ASSIGNMENT_REWARD = 100 * 10 ** 18;    // 100 tokens
-    uint256 public constant SECRET_REVEAL_REWARD = 50 * 10 ** 18;         // 50 tokens
-    uint256 public constant DISPUTE_REWARD = 200 * 10 ** 18;              // 200 tokens
-    uint256 public constant MISSED_ASSIGNMENT_PENALTY = 200 * 10 ** 18;   // 200 tokens
-    uint256 public constant MISSED_CONFIRMATION_PENALTY = 100 * 10 ** 18; // 100 tokens
+    uint256 public constant LEADER_REWARD = 2 * 10 ** 18;
+    uint256 public constant JOB_AVAILABILITY_REWARD = 2 * 10 ** 18;
+    uint256 public constant DISPUTER_REWARD = 2 * 10 ** 18;
+    uint256 public constant LEADER_NOT_EXECUTED_PENALTY = 10 * 10 ** 18;
+    uint256 public constant JOB_NOT_CONFIRMED_PENALTY = 10 * 10 ** 18;
     uint256 public constant MAX_PENALTIES_BEFORE_SLASH = 20;
 
     // JobManager Constants
@@ -31,5 +31,5 @@ library LShared {
     uint256 public constant WHITELIST_COOLDOWN = 7 days;
 
     // NodeEscrow Constants
-    uint256 public constant STAKE_PER_RATING = 1e18; // 1 token per compute rating unit
+    uint256 public constant STAKE_PER_RATING = 1 * 10 ** 18;
 }
