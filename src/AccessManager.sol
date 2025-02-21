@@ -70,7 +70,6 @@ contract AccessManager is IAccessManager {
         if (callerConfirmation != msg.sender) {
             revert MustConfirmRenounce(msg.sender);
         }
-        require(callerConfirmation == msg.sender, "Must confirm renounce");
         _revokeRole(role, msg.sender);
     }
 
