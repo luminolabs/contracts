@@ -44,6 +44,7 @@ class LuminoErrorHandler:
     def __init__(self):
         # Error definitions with their parameter types and formatters
         self.error_defs = {
+            # AccessManager errors
             "RoleManagerUnauthorized": {
                 "params": ["address"],
                 "format": lambda args: f"Account {args[0]} is not authorized for this role"
@@ -56,10 +57,18 @@ class LuminoErrorHandler:
                 "params": [],
                 "format": lambda args: "Cannot revoke the last admin role"
             },
+            "MustConfirmRenounce": {
+                "params": ["address"],
+                "format": lambda args: f"Account {args[0]} must confirm renounce"
+            },
+
+            # EpochManager errors
             "InvalidState": {
                 "params": ["uint8"],
                 "format": lambda args: f"Invalid epoch state: {self.EPOCH_STATE.get(args[0], 'Unknown')}"
             },
+
+            # Escrow (AEscrow) errors
             "BelowMinimumDeposit": {
                 "params": ["uint256", "uint256"],
                 "format": lambda
@@ -86,6 +95,13 @@ class LuminoErrorHandler:
                 "params": [],
                 "format": lambda args: "Token transfer failed"
             },
+            "InsufficientContractBalance": {
+                "params": ["uint256", "uint256"],
+                "format": lambda
+                    args: f"Contract balance insufficient: requested {Web3.from_wei(args[0], 'ether')}, available {Web3.from_wei(args[1], 'ether')}"
+            },
+
+            # JobManager errors
             "InvalidJobStatus": {
                 "params": ["uint256", "uint8", "uint8"],
                 "format": lambda
@@ -104,10 +120,16 @@ class LuminoErrorHandler:
                 "params": ["uint256"],
                 "format": lambda args: f"Job {args[0]} is not in completed state"
             },
+            "InvalidModelName": {
+                "params": ["string"],
+                "format": lambda args: f"Invalid model name: {args[0]}"
+            },
             "NoNewJobs": {
                 "params": [],
                 "format": lambda args: "No new jobs available for assignment"
             },
+
+            # LeaderManager errors
             "NoCommitmentFound": {
                 "params": ["uint256", "uint256"],
                 "format": lambda args: f"No commitment found for epoch {args[0]}, node {args[1]}"
@@ -136,6 +158,8 @@ class LuminoErrorHandler:
                 "params": ["uint256"],
                 "format": lambda args: f"Leader already elected for epoch {args[0]}"
             },
+
+            # NodeManager errors
             "NodeNotFound": {
                 "params": ["uint256"],
                 "format": lambda args: f"Node {args[0]} not found"
@@ -152,6 +176,8 @@ class LuminoErrorHandler:
                 "params": ["uint256", "address"],
                 "format": lambda args: f"Invalid node owner: {args[1]} does not own node {args[0]}"
             },
+
+            # WhitelistManager errors
             "AlreadyWhitelisted": {
                 "params": ["address"],
                 "format": lambda args: f"Computing provider {args[0]} is already whitelisted"
@@ -163,6 +189,16 @@ class LuminoErrorHandler:
             "NotWhitelisted": {
                 "params": ["address"],
                 "format": lambda args: f"Computing provider {args[0]} is not whitelisted"
+            },
+
+            # IncentiveManager errors
+            "EpochAlreadyProcessed": {
+                "params": ["uint256"],
+                "format": lambda args: f"Epoch incentives has already been processed, got epoch {args[0]}"
+            },
+            "CanOnlyProcessCurrentEpoch": {
+                "params": ["uint256", "uint256"],
+                "format": lambda args: f"Can only process current epoch incentives, got epoch {args[0]}, current is {args[1]}"
             }
         }
 
@@ -172,11 +208,11 @@ class LuminoErrorHandler:
         for error_name, error_def in self.error_defs.items():
             # Create the error signature
             params_str = ",".join(error_def["params"])
-            signature = f"{error_name}({params_str})"
+        signature = f"{error_name}({params_str})"
 
-            # Generate the selector
-            selector = w3.keccak(text=signature)[:4].hex()
-            self.error_selectors[selector] = (error_name, error_def)
+        # Generate the selector
+        selector = w3.keccak(text=signature)[:4].hex()
+        self.error_selectors[selector] = (error_name, error_def)
 
     def decode_error(self, error_data: str) -> str:
         """
@@ -239,6 +275,7 @@ class LuminoErrorHandler:
         except Exception as e:
             return f"Failed to decode contract error: {str(error)} (Decoder error: {str(e)})"
 
+
 @dataclass
 class LuminoConfig:
     """Configuration for Lumino Node"""
@@ -248,7 +285,7 @@ class LuminoConfig:
     contracts_dir: str
     data_dir: str = "../node_data"
     log_level: int = logging.INFO
-    test_mode: Optional[bool] = None
+    test_mode: Optional[str] = None
 
     @classmethod
     def from_file(cls, config_path: str) -> 'LuminoConfig':
@@ -368,20 +405,26 @@ class LuminoNode:
         """Set up filters for all relevant contract events"""
         current_block = self.w3.eth.block_number
 
+        # AccessManager events
+        self._create_event_filters(self.access_manager, [
+            'RoleGranted',
+            'RoleRevoked'
+        ], current_block)
+
         # NodeManager events
         self._create_event_filters(self.node_manager, [
             'NodeRegistered',
             'NodeUnregistered',
             'NodeUpdated',
             'StakeValidated',
-            'StakeRequirementUpdated',
+            'StakeRequirementUpdated'
         ], current_block)
 
         # LeaderManager events
         self._create_event_filters(self.leader_manager, [
             'CommitSubmitted',
             'SecretRevealed',
-            'LeaderElected',
+            'LeaderElected'
         ], current_block)
 
         # JobManager events
@@ -393,7 +436,7 @@ class LuminoNode:
             'JobConfirmed',
             'JobCompleted',
             'JobRejected',
-            'PaymentProcessed',
+            'PaymentProcessed'
         ], current_block)
 
         # NodeEscrow events
@@ -403,11 +446,38 @@ class LuminoNode:
             'WithdrawCancelled',
             'Withdrawn',
             'PenaltyApplied',
+            'SlashApplied',
+            'RewardApplied'
         ], current_block)
 
-        # EpochManager events
-        self._create_event_filters(self.epoch_manager, [
+        # JobEscrow events
+        self._create_event_filters(self.job_escrow, [
+            'Deposited',
+            'WithdrawRequested',
+            'WithdrawCancelled',
+            'Withdrawn',
+            'PaymentReleased'
+        ], current_block)
 
+        # WhitelistManager events
+        self._create_event_filters(self.whitelist_manager, [
+            'CPAdded',
+            'CPRemoved'
+        ], current_block)
+
+        # LuminoToken events (ERC20)
+        self._create_event_filters(self.token, [
+            'Transfer',
+            'Approval'
+        ], current_block)
+
+        # IncentiveManager events
+        self._create_event_filters(self.incentive_manager, [
+            'LeaderRewardApplied',
+            'NodeRewardApplied',
+            'DisputerRewardApplied',
+            'LeaderPenaltyApplied',
+            'NodePenaltyApplied'
         ], current_block)
 
     def _create_event_filters(self, contract: Contract, event_names: List[str], from_block: int) -> None:
@@ -499,6 +569,18 @@ class LuminoNode:
     def _init_contracts(self, contract_addresses: Dict[str, str]) -> None:
         """Initialize all contract interfaces"""
         try:
+            self.access_manager = self.w3.eth.contract(
+                address=contract_addresses['AccessManager'],
+                abi=self.abis['AccessManager']
+            )
+            self.logger.info("Initialized AccessManager contract")
+
+            self.whitelist_manager = self.w3.eth.contract(
+                address=contract_addresses['WhitelistManager'],
+                abi=self.abis['WhitelistManager']
+            )
+            self.logger.info("Initialized WhitelistManager contract")
+
             self.token = self.w3.eth.contract(
                 address=contract_addresses['LuminoToken'],
                 abi=self.abis['LuminoToken']
@@ -533,6 +615,12 @@ class LuminoNode:
                 abi=self.abis['JobManager']
             )
             self.logger.info("Initialized JobManager contract")
+
+            self.job_escrow = self.w3.eth.contract(
+                address=contract_addresses['JobEscrow'],
+                abi=self.abis['JobEscrow']
+            )
+            self.logger.info("Initialized JobEscrow contract")
 
             self.epoch_manager = self.w3.eth.contract(
                 address=contract_addresses['EpochManager'],
@@ -749,6 +837,9 @@ class LuminoNode:
                 tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
                 self.w3.eth.wait_for_transaction_receipt(tx_hash)
                 self.logger.info(f"Completed job {job_id}")
+
+                # TODO: Add payment processing
+                # ...
             except Exception as e:
                 self.logger.error(f"Error processing job {job_id}: {e}")
 
@@ -823,6 +914,7 @@ class LuminoNode:
         # so that the cycle starts correctly from COMMIT
         can_begin = False
 
+        epochs_processed = 0
         while True:
             try:
                 current_time = time.time()
@@ -866,7 +958,7 @@ class LuminoNode:
                 # State machine for epoch phases
                 if can_begin and state_changed:
                     try:
-                        if state == 0 and check_test_mode(self.test_mode, 0):  # COMMIT
+                        if state == 0:  # COMMIT
                             self.logger.info("Preparing to submit commitment...")
                             self.submit_commitment()
                             self.logger.info("Commitment submitted successfully")
@@ -891,6 +983,7 @@ class LuminoNode:
                             if self.is_leader != was_leader:
                                 self.logger.info("Node leadership status changed")
                                 self.logger.info(f"Current role: {'Leader' if self.is_leader else 'Not leader'}")
+                            self.logger.info("Checking leader duties complete")
 
                         elif state == 4:  # CONFIRM
                             self.logger.info("Processing assigned jobs...")
@@ -899,13 +992,23 @@ class LuminoNode:
 
                         elif state == 5:  # DISPUTE
                             self.logger.info("Start incentive cycle...")
-
+                            self.start_incentive_cycle()
+                            self.logger.info("Incentive cycle complete")
+                            epochs_processed += 1
 
                     except Exception as phase_error:
                         self.logger.error(f"Error in {current_phase} phase: {phase_error}")
                         self.logger.exception("Detailed traceback:")
                         # Continue to next iteration rather than crashing
                         continue
+
+                # Exit after first cycle for testing
+                if self.test_mode and epochs_processed >= 1:
+                    self.logger.info("Test cycle complete")
+                    time.sleep(10)
+                    # Process any last events
+                    self._check_for_events()
+                    break
 
                 # Node can begin after first DISPUTE phase,
                 # so that the cycle starts correctly from COMMIT
@@ -943,16 +1046,20 @@ def initialize_lumino_node(config_path: str = None) -> LuminoNode:
         'web3_provider': os.getenv('RPC_URL'),
         'private_key': os.getenv('NODE_PRIVATE_KEY'),
         'contract_addresses': {
-            'LuminoToken': os.getenv('TOKEN_ADDRESS'),
+            'LuminoToken': os.getenv('LUMINO_TOKEN_ADDRESS'),
+            'AccessManager': os.getenv('ACCESS_MANAGER_ADDRESS'),
+            'WhitelistManager': os.getenv('WHITELIST_MANAGER_ADDRESS'),
             'NodeManager': os.getenv('NODE_MANAGER_ADDRESS'),
             'IncentiveManager': os.getenv('INCENTIVE_MANAGER_ADDRESS'),
             'NodeEscrow': os.getenv('NODE_ESCROW_ADDRESS'),
             'LeaderManager': os.getenv('LEADER_MANAGER_ADDRESS'),
             'JobManager': os.getenv('JOB_MANAGER_ADDRESS'),
             'EpochManager': os.getenv('EPOCH_MANAGER_ADDRESS'),
+            'JobEscrow': os.getenv('JOB_ESCROW_ADDRESS')
         },
         'contracts_dir': contracts_dir,
         'data_dir': os.path.join(project_root, os.getenv('NODE_DATA_DIR')),
+        'test_mode': os.getenv('TEST_MODE', None)
     }
     config = LuminoConfig.from_file(config_path) if config_path else LuminoConfig(**config)
 

@@ -11,7 +11,6 @@ import {console} from "../lib/forge-std/src/console.sol";
 import {AccessManager} from "../src/AccessManager.sol";
 import {EpochManager} from "../src/EpochManager.sol";
 import {IncentiveManager} from "../src/IncentiveManager.sol";
-import {IncentiveTreasury} from "../src/IncentiveTreasury.sol";
 import {JobEscrow} from "../src/JobEscrow.sol";
 import {JobManager} from "../src/JobManager.sol";
 import {LeaderManager} from "../src/LeaderManager.sol";
@@ -32,7 +31,6 @@ contract DeploymentScript is Script {
     JobEscrow public jobEscrow;
     JobManager public jobManager;
     LeaderManager public leaderManager;
-    IncentiveTreasury public incentiveTreasury;
     IncentiveManager public incentiveManager;
 
     function run() external {
@@ -62,11 +60,6 @@ contract DeploymentScript is Script {
         jobEscrow = new JobEscrow(
             address(accessManager),
             address(token)
-        );
-
-        incentiveTreasury = new IncentiveTreasury(
-            address(token),
-            address(accessManager)
         );
 
         // 4. Deploy node and job management
@@ -100,15 +93,13 @@ contract DeploymentScript is Script {
             address(leaderManager),
             address(jobManager),
             address(nodeManager),
-            address(nodeEscrow),
-            address(incentiveTreasury)
+            address(nodeEscrow)
         );
 
         // 8. Set up roles
         // Grant CONTRACTS_ROLE to contracts that need it
         accessManager.grantRole(LShared.CONTRACTS_ROLE, address(nodeEscrow));
         accessManager.grantRole(LShared.CONTRACTS_ROLE, address(jobEscrow));
-        accessManager.grantRole(LShared.CONTRACTS_ROLE, address(incentiveTreasury));
         accessManager.grantRole(LShared.CONTRACTS_ROLE, address(incentiveManager));
 
         // Grant OPERATOR_ROLE to deployer
@@ -128,7 +119,6 @@ contract DeploymentScript is Script {
         console.log("NodeManager:", address(nodeManager));
         console.log("JobManager:", address(jobManager));
         console.log("LeaderManager:", address(leaderManager));
-        console.log("IncentiveTreasury:", address(incentiveTreasury));
         console.log("IncentiveManager:", address(incentiveManager));
     }
 }

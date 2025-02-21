@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+import {IAccessControl} from "../lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import {IAccessManager} from "./interfaces/IAccessManager.sol";
 import {LShared} from "./libraries/LShared.sol";
 
@@ -66,6 +67,9 @@ contract AccessManager is IAccessManager {
     }
 
     function renounceRole(bytes32 role, address callerConfirmation) external {
+        if (callerConfirmation != msg.sender) {
+            revert MustConfirmRenounce(msg.sender);
+        }
         require(callerConfirmation == msg.sender, "Must confirm renounce");
         _revokeRole(role, msg.sender);
     }
