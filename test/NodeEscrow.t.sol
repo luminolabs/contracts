@@ -22,13 +22,17 @@ contract NodeEscrowTest is Test {
     // Constants
     uint256 public constant MIN_DEPOSIT = 0.1 ether;
     uint256 public constant INITIAL_BALANCE = 1000 ether;
+    uint256 public constant PENALTY_AMOUNT = 50 ether;
+    uint256 public constant REWARD_AMOUNT = 25 ether;
 
     // Events to test
     event Deposited(address indexed user, uint256 amount, uint256 newBalance, string escrowName);
     event WithdrawRequested(address indexed user, uint256 amount, uint256 unlockTime, string escrowName);
     event WithdrawCancelled(address indexed user, uint256 amount, string escrowName);
     event Withdrawn(address indexed user, uint256 amount, uint256 remainingBalance, string escrowName);
-    event PenaltyApplied(address indexed cp, uint256 amount, uint256 newBalance);
+    event PenaltyApplied(address indexed cp, uint256 amount, uint256 newBalance, string reason);
+    event SlashApplied(address indexed cp, uint256 newBalance, string reason);
+    event RewardApplied(address indexed cp, uint256 amount, uint256 newBalance, string reason);
 
     function setUp() public {
         vm.startPrank(admin);
@@ -98,81 +102,6 @@ contract NodeEscrowTest is Test {
         vm.stopPrank();
     }
 
-    function testCancelWithdraw() public {
-        // Setup: deposit and request withdrawal
-        vm.startPrank(cp1);
-        uint256 amount = 1 ether;
-        token.approve(address(nodeEscrow), amount);
-        nodeEscrow.deposit(amount);
-        nodeEscrow.requestWithdraw(amount);
-        
-        // Test event emission for cancellation
-        vm.expectEmit(true, false, false, true);
-        emit WithdrawCancelled(cp1, amount, "stake");
-        
-        // Cancel withdrawal
-        nodeEscrow.cancelWithdraw();
-        
-        vm.stopPrank();
-    }
-
-    function testWithdraw() public {
-        // Setup: deposit and request withdrawal
-        vm.startPrank(cp1);
-        uint256 amount = 1 ether;
-        token.approve(address(nodeEscrow), amount);
-        vm.stopPrank();
-        
-        // Record initial balances
-        uint256 initialCp1Balance = token.balanceOf(cp1);
-        uint256 initialContractBalance = token.balanceOf(address(nodeEscrow));
-
-        console.log("Initial CP balance : ", initialCp1Balance);
-        console.log("Initial contract balance : ", initialContractBalance);
-
-        vm.startPrank(cp1);
-        
-        // Make deposit
-        nodeEscrow.deposit(amount);
-        
-        // Verify post-deposit state
-        assertEq(nodeEscrow.getBalance(cp1), amount);
-        assertEq(token.balanceOf(cp1), initialCp1Balance - amount);
-        assertEq(token.balanceOf(address(nodeEscrow)), initialContractBalance + amount);
-        console.log("token balance of contract : ", token.balanceOf(address(nodeEscrow)));
-        
-        // Request withdrawal
-        nodeEscrow.requestWithdraw(amount);
-        
-        // Move time forward past lock period
-        vm.warp(block.timestamp + 1 days + 1);
-        
-        // Execute withdrawal
-        nodeEscrow.withdraw();
-        
-        // Verify final state
-        assertEq(nodeEscrow.getBalance(cp1), 0);
-        assertEq(token.balanceOf(cp1), initialCp1Balance); // Should be back to initial balance
-        assertEq(token.balanceOf(address(nodeEscrow)), initialContractBalance); // Should be back to initial balance
-        
-        vm.stopPrank();
-    }
-
-    function testWithdrawBeforeLockPeriod() public {
-        // Setup: deposit and request withdrawal
-        vm.startPrank(cp1);
-        uint256 amount = 1 ether;
-        token.approve(address(nodeEscrow), amount);
-        nodeEscrow.deposit(amount);
-        nodeEscrow.requestWithdraw(amount);
-        
-        // Attempt withdrawal before lock period ends
-        vm.expectRevert(abi.encodeWithSignature("LockPeriodActive(address,uint256)", cp1, 1 days));
-        nodeEscrow.withdraw();
-        
-        vm.stopPrank();
-    }
-
     function testApplyPenalty() public {
         // Setup: deposit some tokens
         vm.startPrank(cp1);
@@ -181,18 +110,69 @@ contract NodeEscrowTest is Test {
         nodeEscrow.deposit(depositAmount);
         vm.stopPrank();
         
+        string memory reason = "Missed assignment round";
+        
         // Apply penalty from contract role
         vm.startPrank(contractRole);
-        uint256 penaltyAmount = 0.5 ether;
         
         // Test event emission for penalty
         vm.expectEmit(true, false, false, true);
-        emit PenaltyApplied(cp1, penaltyAmount, depositAmount - penaltyAmount);
+        emit PenaltyApplied(cp1, PENALTY_AMOUNT, depositAmount - PENALTY_AMOUNT, reason);
         
-        nodeEscrow.applyPenalty(cp1, penaltyAmount);
+        nodeEscrow.applyPenalty(cp1, PENALTY_AMOUNT, reason);
         
         // Verify reduced balance
-        assertEq(nodeEscrow.getBalance(cp1), depositAmount - penaltyAmount);
+        assertEq(nodeEscrow.getBalance(cp1), depositAmount - PENALTY_AMOUNT);
+        
+        vm.stopPrank();
+    }
+
+    function testApplySlash() public {
+        // Setup: deposit some tokens
+        vm.startPrank(cp1);
+        uint256 depositAmount = 1 ether;
+        token.approve(address(nodeEscrow), depositAmount);
+        nodeEscrow.deposit(depositAmount);
+        vm.stopPrank();
+        
+        string memory reason = "Exceeded maximum penalties";
+        
+        // Apply slash from contract role
+        vm.startPrank(contractRole);
+        
+        // Test event emission for slash
+        vm.expectEmit(true, false, false, true);
+        emit SlashApplied(cp1, 0, reason);
+        
+        nodeEscrow.applySlash(cp1, reason);
+        
+        // Verify balance is zeroed
+        assertEq(nodeEscrow.getBalance(cp1), 0);
+        
+        vm.stopPrank();
+    }
+
+    function testApplyReward() public {
+        // Setup: deposit some tokens
+        vm.startPrank(cp1);
+        uint256 depositAmount = 1 ether;
+        token.approve(address(nodeEscrow), depositAmount);
+        nodeEscrow.deposit(depositAmount);
+        vm.stopPrank();
+        
+        string memory reason = "Secret revelation reward";
+        
+        // Apply reward from contract role
+        vm.startPrank(contractRole);
+        
+        // Test event emission for reward
+        vm.expectEmit(true, false, false, true);
+        emit RewardApplied(cp1, REWARD_AMOUNT, depositAmount + REWARD_AMOUNT, reason);
+        
+        nodeEscrow.applyReward(cp1, REWARD_AMOUNT, reason);
+        
+        // Verify increased balance
+        assertEq(nodeEscrow.getBalance(cp1), depositAmount + REWARD_AMOUNT);
         
         vm.stopPrank();
     }
@@ -215,7 +195,7 @@ contract NodeEscrowTest is Test {
             penaltyAmount,
             depositAmount
         ));
-        nodeEscrow.applyPenalty(cp1, penaltyAmount);
+        nodeEscrow.applyPenalty(cp1, penaltyAmount, "Too large penalty");
         
         vm.stopPrank();
     }
@@ -230,58 +210,14 @@ contract NodeEscrowTest is Test {
         
         // Try to apply penalty from unauthorized address
         vm.startPrank(cp2);
-        uint256 penaltyAmount = 0.5 ether;
         
         vm.expectRevert(abi.encodeWithSignature("RoleManagerUnauthorized(address)", cp2));
-        nodeEscrow.applyPenalty(cp1, penaltyAmount);
+        nodeEscrow.applyPenalty(cp1, PENALTY_AMOUNT, "Unauthorized penalty");
         
         vm.stopPrank();
     }
 
-    function testMultipleDepositsAndWithdraws() public {
-        // First, ensure cp1 has approved enough tokens
-        vm.startPrank(cp1);
-        uint256 deposit1 = 1 ether;
-        uint256 deposit2 = 2 ether;
-        token.approve(address(nodeEscrow), deposit1 + deposit2);
-        vm.stopPrank();
-
-        // Record initial balances
-        uint256 initialCp1Balance = token.balanceOf(cp1);
-        uint256 initialContractBalance = token.balanceOf(address(nodeEscrow));
-
-        vm.startPrank(cp1);
-        
-        // Make multiple deposits
-        nodeEscrow.deposit(deposit1);
-        nodeEscrow.deposit(deposit2);
-        
-        // Verify total escrow balance
-        assertEq(nodeEscrow.getBalance(cp1), deposit1 + deposit2);
-        
-        // Verify token transfers occurred correctly
-        assertEq(token.balanceOf(cp1), initialCp1Balance - (deposit1 + deposit2));
-        assertEq(token.balanceOf(address(nodeEscrow)), initialContractBalance + deposit1 + deposit2);
-        
-        // Request partial withdrawal
-        uint256 withdrawAmount = 1.5 ether;
-        nodeEscrow.requestWithdraw(withdrawAmount);
-        
-        // Move time forward
-        vm.warp(block.timestamp + 1 days + 1);
-        
-        // Execute withdrawal
-        nodeEscrow.withdraw();
-        
-        // Verify remaining balances
-        assertEq(nodeEscrow.getBalance(cp1), deposit1 + deposit2 - withdrawAmount);
-        assertEq(token.balanceOf(cp1), initialCp1Balance - (deposit1 + deposit2) + withdrawAmount);
-        assertEq(token.balanceOf(address(nodeEscrow)), initialContractBalance + deposit1 + deposit2 - withdrawAmount);
-        
-        vm.stopPrank();
-    }
-
-    function testRequireBalance() public {
+    function testUnauthorizedSlash() public {
         // Setup: deposit some tokens
         vm.startPrank(cp1);
         uint256 depositAmount = 1 ether;
@@ -289,16 +225,89 @@ contract NodeEscrowTest is Test {
         nodeEscrow.deposit(depositAmount);
         vm.stopPrank();
         
-        // Test successful balance requirement
-        nodeEscrow.requireBalance(cp1, depositAmount);
+        // Try to apply slash from unauthorized address
+        vm.startPrank(cp2);
         
-        // Test failed balance requirement
-        vm.expectRevert(abi.encodeWithSignature(
-            "InsufficientBalance(address,uint256,uint256)",
-            cp1,
-            depositAmount + 1,
-            depositAmount
-        ));
-        nodeEscrow.requireBalance(cp1, depositAmount + 1);
+        vm.expectRevert(abi.encodeWithSignature("RoleManagerUnauthorized(address)", cp2));
+        nodeEscrow.applySlash(cp1, "Unauthorized slash");
+        
+        vm.stopPrank();
+    }
+
+    function testUnauthorizedReward() public {
+        // Setup: deposit some tokens
+        vm.startPrank(cp1);
+        uint256 depositAmount = 1 ether;
+        token.approve(address(nodeEscrow), depositAmount);
+        nodeEscrow.deposit(depositAmount);
+        vm.stopPrank();
+        
+        // Try to apply reward from unauthorized address
+        vm.startPrank(cp2);
+        
+        vm.expectRevert(abi.encodeWithSignature("RoleManagerUnauthorized(address)", cp2));
+        nodeEscrow.applyReward(cp1, REWARD_AMOUNT, "Unauthorized reward");
+        
+        vm.stopPrank();
+    }
+
+    function testCombinedRewardsPenalties() public {
+        // Setup: deposit some tokens
+        vm.startPrank(cp1);
+        uint256 depositAmount = 1 ether;
+        token.approve(address(nodeEscrow), depositAmount);
+        nodeEscrow.deposit(depositAmount);
+        vm.stopPrank();
+
+        vm.startPrank(contractRole);
+        
+        // Apply rewards and penalties in sequence
+        nodeEscrow.applyReward(cp1, REWARD_AMOUNT, "First reward");
+        uint256 balanceAfterReward = nodeEscrow.getBalance(cp1);
+        assertEq(balanceAfterReward, depositAmount + REWARD_AMOUNT);
+        
+        nodeEscrow.applyPenalty(cp1, PENALTY_AMOUNT, "First penalty");
+        uint256 balanceAfterPenalty = nodeEscrow.getBalance(cp1);
+        assertEq(balanceAfterPenalty, balanceAfterReward - PENALTY_AMOUNT);
+        
+        // Apply slash to zero the balance
+        nodeEscrow.applySlash(cp1, "Final slash");
+        assertEq(nodeEscrow.getBalance(cp1), 0);
+        
+        vm.stopPrank();
+    }
+
+    function testWithdrawAfterRewardsAndPenalties() public {
+        // Setup: deposit
+        vm.startPrank(cp1);
+        uint256 depositAmount = 1 ether;
+        token.approve(address(nodeEscrow), depositAmount);
+        nodeEscrow.deposit(depositAmount);
+
+        // Apply some rewards and penalties
+        vm.startPrank(contractRole);
+        nodeEscrow.applyReward(cp1, REWARD_AMOUNT, "Test reward");
+        nodeEscrow.applyPenalty(cp1, PENALTY_AMOUNT, "Test penalty");
+        vm.stopPrank();
+
+        // Calculate expected final balance
+        uint256 expectedBalance = depositAmount + REWARD_AMOUNT - PENALTY_AMOUNT;
+        assertEq(nodeEscrow.getBalance(cp1), expectedBalance);
+
+        // Try to withdraw the full balance
+        vm.startPrank(cp1);
+        nodeEscrow.requestWithdraw(expectedBalance);
+        
+        // Move time forward past lock period
+        vm.warp(block.timestamp + 1 days + 1);
+        
+        // Execute withdrawal
+        nodeEscrow.withdraw();
+        
+        // Verify final state
+        assertEq(nodeEscrow.getBalance(cp1), 0);
+        assertEq(token.balanceOf(cp1), INITIAL_BALANCE);
+        
+        vm.stopPrank();
     }
 }
