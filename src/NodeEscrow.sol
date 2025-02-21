@@ -19,8 +19,10 @@ contract NodeEscrow is AEscrow, INodeEscrow {
     ) external {
         accessManager.requireRole(LShared.CONTRACTS_ROLE, msg.sender);
 
+        // Ensure the penalty doesn't exceed the CP's balance;
+        // this should never happen if incentives are properly configured
         if (balances[cp] < amount) {
-            revert InsufficientBalance(cp, amount, balances[cp]);
+            amount = balances[cp];
         }
 
         balances[cp] -= amount;

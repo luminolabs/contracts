@@ -15,7 +15,7 @@ contract IncentiveManager is IIncentiveManager {
     ILeaderManager internal immutable leaderManager;
     IJobManager internal immutable jobManager;
     INodeManager internal immutable nodeManager;
-    INodeEscrow internal immutable stakeEscrow;
+    INodeEscrow internal immutable nodeEscrow;
 
     // State variables
     mapping(address => uint256) public penaltyCount;
@@ -35,14 +35,16 @@ contract IncentiveManager is IIncentiveManager {
         leaderManager = ILeaderManager(_leaderManager);
         jobManager = IJobManager(_jobManager);
         nodeManager = INodeManager(_nodeManager);
-        stakeEscrow = INodeEscrow(_stakeEscrow);
+        nodeEscrow = INodeEscrow(_stakeEscrow);
     }
 
     /**
      * @notice Process all rewards and penalties for an epoch
      */
-    function processAll(uint256 epoch) external {
-        // Validate epoch
+    function processAll() external {
+        uint256 epoch = epochManager.getCurrentEpoch();
+
+        // Validate that epoch hasn't been processed yet
         validate(epoch);
         // Dispute first so that disputer can be rewarded
         disputeAll(epoch);
@@ -56,7 +58,7 @@ contract IncentiveManager is IIncentiveManager {
         // Reward leader for assignments
         address leader = nodeManager.getNodeOwner(leaderManager.getCurrentLeader());
         if (!leaderRewardClaimed[epoch] && jobManager.wasAssignmentRoundStarted(epoch)) {
-            stakeEscrow.applyReward(
+            nodeEscrow.applyReward(
                 leader,
                 LShared.LEADER_ASSIGNMENT_REWARD,
                 "Leader assignment round completion"
@@ -70,7 +72,7 @@ contract IncentiveManager is IIncentiveManager {
         for (uint256 i = 0; i < revealedNodes.length; i++) {
             if (!nodeRewardsClaimed[epoch][revealedNodes[i]]) {
                 address nodeOwner = nodeManager.getNodeOwner(revealedNodes[i]);
-                stakeEscrow.applyReward(
+                nodeEscrow.applyReward(
                     nodeOwner,
                     LShared.SECRET_REVEAL_REWARD,
                     "Secret revelation reward"
@@ -82,7 +84,7 @@ contract IncentiveManager is IIncentiveManager {
 
         // Reward disputer
         if (!disputerRewardClaimed[epoch]) {
-            stakeEscrow.applyReward(
+            nodeEscrow.applyReward(
                 msg.sender,
                 LShared.DISPUTE_REWARD,
                 "Dispute completion reward"
@@ -96,7 +98,7 @@ contract IncentiveManager is IIncentiveManager {
         // Penalize leader for missing assignments
         address leader = nodeManager.getNodeOwner(leaderManager.getCurrentLeader());
         if (!jobManager.wasAssignmentRoundStarted(epoch)) {
-            stakeEscrow.applyPenalty(
+            nodeEscrow.applyPenalty(
                 leader,
                 LShared.MISSED_ASSIGNMENT_PENALTY,
                 "Missed assignment round"
@@ -111,7 +113,7 @@ contract IncentiveManager is IIncentiveManager {
         uint256[] memory unconfirmedJobs = jobManager.getUnconfirmedJobs(epoch);
         for (uint256 i = 0; i < unconfirmedJobs.length; i++) {
             address nodeOwner = nodeManager.getNodeOwner(jobManager.getAssignedNode(unconfirmedJobs[i]));
-            stakeEscrow.applyPenalty(
+            nodeEscrow.applyPenalty(
                 nodeOwner,
                 LShared.MISSED_CONFIRMATION_PENALTY,
                 "Missed job confirmation"
@@ -127,15 +129,11 @@ contract IncentiveManager is IIncentiveManager {
         if (processedEpochs[epoch]) {
             revert EpochAlreadyProcessed(epoch);
         }
-        uint256 current_epoch = epochManager.getCurrentEpoch();
-        if (epoch != current_epoch) {
-            revert CanOnlyProcessCurrentEpoch(epoch, current_epoch);
-        }
         processedEpochs[epoch] = true;
     }
 
     function slashCP(address cp, string memory reason) internal {
-        stakeEscrow.applySlash(cp, reason);
+        nodeEscrow.applySlash(cp, reason);
     }
 
     function incrementPenalty(address cp) internal returns (bool shouldSlash) {

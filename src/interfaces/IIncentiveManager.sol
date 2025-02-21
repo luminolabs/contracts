@@ -4,7 +4,6 @@ pragma solidity ^0.8.17;
 interface IIncentiveManager {
     // Errors
     error EpochAlreadyProcessed(uint256 epoch);
-    error CanOnlyProcessCurrentEpoch(uint256 epoch, uint256 currentEpoch);
 
     // Events
     event LeaderRewardApplied(uint256 indexed epoch, address cp, uint256 amount);
@@ -15,5 +14,5 @@ interface IIncentiveManager {
 
 
     // Incentive manager functions
-    function processAll(uint256 epoch) external;
+    function processAll() external;
 }

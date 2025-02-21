@@ -195,10 +195,6 @@ class LuminoErrorHandler:
             "EpochAlreadyProcessed": {
                 "params": ["uint256"],
                 "format": lambda args: f"Epoch incentives has already been processed, got epoch {args[0]}"
-            },
-            "CanOnlyProcessCurrentEpoch": {
-                "params": ["uint256", "uint256"],
-                "format": lambda args: f"Can only process current epoch incentives, got epoch {args[0]}, current is {args[1]}"
             }
         }
 
@@ -878,8 +874,7 @@ class LuminoNode:
 
     def start_incentive_cycle(self) -> None:
         """Start the incentive cycle for the current epoch"""
-        current_epoch = self.epoch_manager.functions.getCurrentEpoch().call()
-        tx = self.incentive_manager.functions.processAll(current_epoch).build_transaction({
+        tx = self.incentive_manager.functions.processAll().build_transaction({
             'from': self.address,
             'nonce': self.w3.eth.get_transaction_count(self.address),
         })
@@ -1000,6 +995,11 @@ class LuminoNode:
                         self.logger.error(f"Error in {current_phase} phase: {phase_error}")
                         self.logger.exception("Detailed traceback:")
                         # Continue to next iteration rather than crashing
+                        if self.test_mode:
+                            time.sleep(10)
+                            # Process any last events
+                            self._check_for_events()
+                            raise
                         continue
 
                 # Exit after first cycle for testing
