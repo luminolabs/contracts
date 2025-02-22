@@ -34,18 +34,18 @@ contract IncentiveManagerTest is Test {
     address public jobSubmitter = address(5);
 
     // Constants
-    uint256 public constant INITIAL_BALANCE = 1000 ether;
+    uint256 public constant INITIAL_BALANCE = 10000 ether;
     uint256 public constant COMPUTE_RATING = 10;
-    uint256 public constant STAKE_AMOUNT = 100 ether;
+    uint256 public constant STAKE_AMOUNT = 1000 ether; // Increased stake amount
     uint256 public constant JOB_DEPOSIT = 10 ether;
     string public constant MODEL_NAME = "llm_llama3_1_8b";
 
     // Events to test
     event LeaderRewardApplied(uint256 indexed epoch, address cp, uint256 amount);
-    event NodeRewardApplied(uint256 indexed epoch, uint256[] indexed nodeIds, uint256 amount);
+    event JobAvailabilityRewardApplied(uint256 indexed epoch, uint256 indexed nodeId, uint256 amount);
     event DisputerRewardApplied(uint256 indexed epoch, address cp, uint256 amount);
-    event LeaderPenaltyApplied(uint256 indexed epoch, address cp, uint256 amount);
-    event NodePenaltyApplied(uint256 indexed epoch, uint256[] indexed jobs, uint256 amount);
+    event LeaderNotExecutedPenaltyApplied(uint256 indexed epoch, address cp, uint256 amount);
+    event JobNotConfirmedPenaltyApplied(uint256 indexed epoch, uint256 indexed job, uint256 amount);
 
     function setUp() public {
         vm.startPrank(admin);
@@ -91,15 +91,18 @@ contract IncentiveManagerTest is Test {
         // Setup roles
         accessManager.grantRole(LShared.CONTRACTS_ROLE, address(incentiveManager));
         accessManager.grantRole(LShared.OPERATOR_ROLE, operator);
+        accessManager.grantRole(LShared.CONTRACTS_ROLE, address(jobManager));
         
         // Whitelist CPs
         whitelistManager.addCP(cp1);
         whitelistManager.addCP(cp2);
 
-        // Fund accounts
+        // Fund accounts and contracts
         token.transfer(cp1, INITIAL_BALANCE);
         token.transfer(cp2, INITIAL_BALANCE);
         token.transfer(jobSubmitter, INITIAL_BALANCE);
+        // Fund nodeEscrow for rewards
+        token.transfer(address(nodeEscrow), INITIAL_BALANCE * 10); // Much larger balance for rewards
 
         vm.stopPrank();
 
@@ -117,6 +120,7 @@ contract IncentiveManagerTest is Test {
     }
 
     function _setupEpochAndLeader() internal returns (uint256 leaderId) {
+        // Setup leader
         vm.startPrank(cp1);
         bytes memory secret = bytes("secret");
         bytes32 commitment = keccak256(secret);
@@ -132,29 +136,7 @@ contract IncentiveManagerTest is Test {
         return leaderId;
     }
 
-    function testSecretRevealReward() public {
-        // Start at a clean epoch boundary
-        vm.warp(LShared.EPOCH_DURATION);
-        
-        // Setup epoch and reveal secret
-        _setupEpochAndLeader();
-        uint256 currentEpoch = epochManager.getCurrentEpoch();
-        
-        // Get initial balance
-        uint256 cp1BalanceBefore = nodeEscrow.getBalance(cp1);
-        
-        // Process rewards
-        incentiveManager.processAll(currentEpoch);
-        
-        // Verify reward was distributed
-        assertEq(
-            token.balanceOf(cp1) - cp1BalanceBefore,
-            LShared.JOB_AVAILABILITY_REWARD,
-            "Secret reveal reward not distributed correctly"
-        );
-    }
-
-    function testLeaderAssignmentReward() public {
+    function testLeaderReward() public {
         // Start at a clean epoch boundary
         vm.warp(LShared.EPOCH_DURATION);
         
@@ -178,18 +160,45 @@ contract IncentiveManagerTest is Test {
         // Get initial balance
         uint256 leaderBalanceBefore = nodeEscrow.getBalance(leader);
         
-        // Process rewards for current epoch
-        incentiveManager.processAll(epochManager.getCurrentEpoch());
+        // Move to dispute phase for processing
+        vm.warp(block.timestamp + LShared.EXECUTE_DURATION + LShared.CONFIRM_DURATION);
+        
+        // Process rewards
+        incentiveManager.processAll();
         
         // Verify leader reward
         assertEq(
-            token.balanceOf(leader) - leaderBalanceBefore,
+            nodeEscrow.getBalance(leader) - leaderBalanceBefore,
             LShared.LEADER_REWARD,
-            "Leader assignment reward not distributed correctly"
+            "Leader reward not applied correctly"
         );
     }
 
-    function testMissedAssignmentPenalty() public {
+    function testJobAvailabilityReward() public {
+        // Start at a clean epoch boundary
+        vm.warp(LShared.EPOCH_DURATION);
+        
+        // Setup epoch and reveal secret
+        _setupEpochAndLeader();
+        
+        // Get initial balance
+        uint256 cp1BalanceBefore = nodeEscrow.getBalance(cp1);
+        
+        // Move to dispute phase
+        vm.warp(block.timestamp + LShared.ELECT_DURATION + LShared.EXECUTE_DURATION + LShared.CONFIRM_DURATION);
+        
+        // Process rewards
+        incentiveManager.processAll();
+        
+        // Verify job availability reward
+        assertEq(
+            nodeEscrow.getBalance(cp1) - cp1BalanceBefore,
+            LShared.JOB_AVAILABILITY_REWARD,
+            "Job availability reward not applied correctly"
+        );
+    }
+
+    function testLeaderPenalty() public {
         // Start at a clean epoch boundary
         vm.warp(LShared.EPOCH_DURATION);
         
@@ -207,18 +216,21 @@ contract IncentiveManagerTest is Test {
         // Get initial balance
         uint256 leaderBalanceBefore = nodeEscrow.getBalance(leader);
         
-        // Process penalties for current epoch
-        incentiveManager.processAll(epochManager.getCurrentEpoch());
+        // Move to dispute phase
+        vm.warp(block.timestamp + LShared.ELECT_DURATION + LShared.EXECUTE_DURATION + LShared.CONFIRM_DURATION);
         
-        // Verify penalty was applied
+        // Process penalties
+        incentiveManager.processAll();
+        
+        // Verify leader penalty
         assertEq(
-            leaderBalanceBefore - token.balanceOf(leader),
+            leaderBalanceBefore - nodeEscrow.getBalance(leader),
             LShared.LEADER_NOT_EXECUTED_PENALTY,
-            "Missed assignment penalty not applied correctly"
+            "Leader penalty not applied correctly"
         );
     }
 
-    function testMissedConfirmationPenalty() public {
+    function testJobConfirmationPenalty() public {
         // Start at a clean epoch boundary
         vm.warp(LShared.EPOCH_DURATION);
         
@@ -242,22 +254,25 @@ contract IncentiveManagerTest is Test {
         address assignedNode = nodeManager.getNodeOwner(assignedNodeId);
         uint256 nodeBalanceBefore = nodeEscrow.getBalance(assignedNode);
         
-        // Process penalties for current epoch
-        incentiveManager.processAll(epochManager.getCurrentEpoch());
+        // Move to dispute phase
+        vm.warp(block.timestamp + LShared.EXECUTE_DURATION + LShared.CONFIRM_DURATION);
         
-        // Verify penalty was applied
+        // Process penalties
+        incentiveManager.processAll();
+        
+        // Verify job confirmation penalty
         assertEq(
-            nodeBalanceBefore - token.balanceOf(assignedNode),
+            nodeBalanceBefore - nodeEscrow.getBalance(assignedNode),
             LShared.JOB_NOT_CONFIRMED_PENALTY,
-            "Missed confirmation penalty not applied correctly"
+            "Job confirmation penalty not applied correctly"
         );
     }
 
-    function testMaxPenaltiesSlashing() public {
+    function testSlashingAfterMaxPenalties() public {
         // Start at a clean epoch boundary
         vm.warp(LShared.EPOCH_DURATION);
         
-        // Setup leader
+        // Setup leader but don't execute assignments
         uint256 leaderId = _setupEpochAndLeader();
         address leader = nodeManager.getNodeOwner(leaderId);
         
@@ -268,80 +283,63 @@ contract IncentiveManagerTest is Test {
         jobManager.submitJob("test job", MODEL_NAME, COMPUTE_RATING);
         vm.stopPrank();
         
-        // Process penalties for multiple epochs until slash
+        // Process penalties for multiple epochs until slashing
         for (uint256 i = 0; i < LShared.MAX_PENALTIES_BEFORE_SLASH; i++) {
-            incentiveManager.processAll(epochManager.getCurrentEpoch());
-            // Move to next epoch
-            vm.warp(block.timestamp + LShared.EPOCH_DURATION);
+            // Move to dispute phase for current epoch
+            vm.warp(block.timestamp + LShared.ELECT_DURATION + LShared.EXECUTE_DURATION + LShared.CONFIRM_DURATION);
+            incentiveManager.processAll();
+            
+            // Move to next epoch's commit phase
+            vm.warp(block.timestamp + LShared.DISPUTE_DURATION + 1);
+            
+            if (i < LShared.MAX_PENALTIES_BEFORE_SLASH - 1) {
+                // Setup next epoch's leader (except for last iteration)
+                leaderId = _setupEpochAndLeader();
+            }
         }
         
-        // Verify complete stake slashing
+        // Verify slashing occurred
         assertEq(
             nodeEscrow.getBalance(leader),
             0,
-            "Stake not completely slashed after max penalties"
+            "Account not slashed after max penalties"
         );
     }
 
-    function testCannotProcessPastEpoch() public {
-        vm.warp(LShared.EPOCH_DURATION * 2); // Move to epoch 3
-        vm.expectRevert(abi.encodeWithSignature(
-            "CanOnlyProcessCurrentEpoch(uint256,uint256)",
-            1,
-            3
-        ));
-        incentiveManager.processAll(1);
-    }
-
-    function testCannotProcessFutureEpoch() public {
-        vm.warp(LShared.EPOCH_DURATION); // At epoch 2
-        vm.expectRevert(abi.encodeWithSignature(
-            "CanOnlyProcessCurrentEpoch(uint256,uint256)",
-            3,
-            2
-        ));
-        incentiveManager.processAll(3);
-    }
-
-    function testCannotProcessEpochTwice() public {
-        // Start at epoch boundary
-        vm.warp(LShared.EPOCH_DURATION);
-        uint256 currentEpoch = epochManager.getCurrentEpoch();
-        
-        // Process first time
-        incentiveManager.processAll(currentEpoch);
-        
-        // Try to process same epoch again
-        vm.expectRevert(abi.encodeWithSignature(
-            "EpochAlreadyProcessed(uint256)",
-            currentEpoch
-        ));
-        incentiveManager.processAll(currentEpoch);
-    }
-
-    function testMultipleNodesRevealReward() public {
+    function testCannotProcessTwice() public {
         // Start at a clean epoch boundary
         vm.warp(LShared.EPOCH_DURATION);
-        uint256 currentEpoch = epochManager.getCurrentEpoch();
         
-        // Setup first node
+        // First processing should succeed
+        incentiveManager.processAll();
+        
+        // Second processing should fail
+        vm.expectRevert(abi.encodeWithSignature(
+            "EpochAlreadyProcessed(uint256)",
+            epochManager.getCurrentEpoch()
+        ));
+        incentiveManager.processAll();
+    }
+
+    function testMultipleNodeRewards() public {
+        // Start at a clean epoch boundary
+        vm.warp(LShared.EPOCH_DURATION);
+        
+        // Setup nodes to reveal secrets
         vm.startPrank(cp1);
         bytes memory secret1 = bytes("secret1");
         bytes32 commitment1 = keccak256(secret1);
         leaderManager.submitCommitment(1, commitment1);
         vm.stopPrank();
         
-        // Setup second node
         vm.startPrank(cp2);
         bytes memory secret2 = bytes("secret2");
         bytes32 commitment2 = keccak256(secret2);
         leaderManager.submitCommitment(2, commitment2);
         vm.stopPrank();
         
-        // Move to reveal phase
         vm.warp(block.timestamp + LShared.COMMIT_DURATION);
         
-        // Both nodes reveal
         vm.prank(cp1);
         leaderManager.revealSecret(1, secret1);
         vm.prank(cp2);
@@ -351,19 +349,22 @@ contract IncentiveManagerTest is Test {
         uint256 cp1BalanceBefore = nodeEscrow.getBalance(cp1);
         uint256 cp2BalanceBefore = nodeEscrow.getBalance(cp2);
         
-        // Process rewards
-        incentiveManager.processAll(currentEpoch);
+        // Move to dispute phase
+        vm.warp(block.timestamp + LShared.REVEAL_DURATION + LShared.ELECT_DURATION + LShared.EXECUTE_DURATION + LShared.CONFIRM_DURATION);
         
-        // Verify both nodes received reveal reward
+        // Process rewards
+        incentiveManager.processAll();
+        
+        // Verify both nodes received rewards
         assertEq(
-            token.balanceOf(cp1) - cp1BalanceBefore,
+            nodeEscrow.getBalance(cp1) - cp1BalanceBefore,
             LShared.JOB_AVAILABILITY_REWARD,
-            "First node did not receive reveal reward"
+            "First node reward not applied correctly"
         );
         assertEq(
-            token.balanceOf(cp2) - cp2BalanceBefore,
+            nodeEscrow.getBalance(cp2) - cp2BalanceBefore,
             LShared.JOB_AVAILABILITY_REWARD,
-            "Second node did not receive reveal reward"
+            "Second node reward not applied correctly"
         );
     }
 }
