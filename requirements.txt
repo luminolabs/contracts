@@ -3,3 +3,4 @@ eth-account
 eth-typing
 python-dotenv
 eth_abi
+click

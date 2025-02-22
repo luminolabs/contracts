@@ -209,27 +209,27 @@ class LuminoNode:
     def process_assigned_jobs(self) -> None:
         """Process any jobs assigned to this node"""
         try:
-            # Get jobs assigned to this node
-            job_ids, job_args = self.sdk.get_jobs_by_node(self.node_id)
-            assigned_jobs = dict(zip(job_ids, job_args))
-
-            for job_id, job_args in assigned_jobs.items():
+            jobs = self.sdk.get_jobs_by_node(self.node_id)
+            for job in jobs:
+                job_id = job["id"]
+                job_args = job["args"]
+                status = job["status"]
                 try:
-                    # Confirm job
-                    self.sdk.confirm_job(job_id)
-                    self.logger.info(f"Confirmed job {job_id}")
-
-                    # Execute job
-                    self._execute_job(job_id, job_args)
-
-                    # Mark job as complete
-                    self.sdk.complete_job(job_id)
-                    self.logger.info(f"Completed job {job_id}")
-
+                    if status == 1:  # ASSIGNED
+                        self.sdk.confirm_job(job_id)
+                        self.logger.info(f"Confirmed job {job_id}")
+                        self._execute_job(job_id, job_args)
+                        self.sdk.complete_job(job_id)
+                        self.logger.info(f"Completed job {job_id}")
+                        self.sdk.process_job_payment(job_id)
+                    elif status == 2:  # CONFIRMED
+                        self._execute_job(job_id, job_args)
+                        self.sdk.complete_job(job_id)
+                        self.logger.info(f"Completed job {job_id}")
+                        self.sdk.process_job_payment(job_id)
                 except Exception as e:
                     self.logger.error(f"Error processing job {job_id}: {e}")
                     continue
-
         except ContractError as e:
             self.logger.error(f"Error getting assigned jobs: {e}")
             raise
@@ -239,7 +239,9 @@ class LuminoNode:
         self.logger.info(f"Executing job {job_id}")
         try:
             # Simulated work
-            time.sleep(10)
+            time.sleep(2)
+            self.sdk.set_token_count_for_job(job_id, 1000000)
+            time.sleep(5)
             self.logger.info(f"Job [{job_id} : {job_args}] execution completed")
         except Exception as e:
             self.logger.error(f"Error executing job {job_id}: {e}")

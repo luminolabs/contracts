@@ -98,9 +98,8 @@ contract DeploymentScript is Script {
 
         // 8. Set up roles
         // Grant CONTRACTS_ROLE to contracts that need it
-        accessManager.grantRole(LShared.CONTRACTS_ROLE, address(nodeEscrow));
-        accessManager.grantRole(LShared.CONTRACTS_ROLE, address(jobEscrow));
         accessManager.grantRole(LShared.CONTRACTS_ROLE, address(incentiveManager));
+        accessManager.grantRole(LShared.CONTRACTS_ROLE, address(jobManager));
 
         // Grant OPERATOR_ROLE to deployer
         accessManager.grantRole(LShared.OPERATOR_ROLE, msg.sender);

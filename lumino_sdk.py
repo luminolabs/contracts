@@ -260,6 +260,12 @@ class LuminoSDK:
             self.job_manager.functions.startAssignmentRound()
         )
 
+    def set_token_count_for_job(self, job_id: int, token_count: int) -> dict:
+        """Set token count for a job"""
+        return self._send_transaction(
+            self.job_manager.functions.setTokenCountForJob(job_id, token_count)
+        )
+
     def confirm_job(self, job_id: int) -> dict:
         """Confirm assigned job"""
         return self._send_transaction(
@@ -284,13 +290,28 @@ class LuminoSDK:
             self.job_manager.functions.processPayment(job_id)
         )
 
-    def get_jobs_by_node(self, node_id: int) -> Tuple[List[int], List[str]]:
-        """Get jobs assigned to node"""
-        return self.job_manager.functions.getJobsDetailsByNode(node_id).call()
+    def get_jobs_by_node(self, node_id: int) -> List[dict]:
+        """Get detailed job information for a node"""
+        jobs = self.job_manager.functions.getJobsDetailsByNode(node_id).call()
+        return [{"id": j[0], "submitter": j[1], "assignedNode": j[2], "status": j[3],
+                 "requiredPool": j[4], "args": j[5], "base_model_name": j[6],
+                 "tokenCount": j[7], "createdAt": j[8]} for j in jobs]
 
     def get_assigned_node(self, job_id: int) -> int:
         """Get node assigned to a job"""
         return self.job_manager.functions.getAssignedNode(job_id).call()
+
+    def get_job_status(self, job_id: int) -> int:
+        """Get the status of a job"""
+        return self.job_manager.functions.getJobStatus(job_id).call()
+
+    def get_job_details(self, job_id: int) -> tuple:
+        """Get detailed information about a job"""
+        return self.job_manager.functions.getJobDetails(job_id).call()
+
+    def get_jobs_by_submitter(self, submitter: str) -> List[int]:
+        """Get all job IDs submitted by an address"""
+        return self.job_manager.functions.getJobsBySubmitter(submitter).call()
 
     # Job Escrow functions
     def deposit_job_funds(self, amount: int) -> dict:
