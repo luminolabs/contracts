@@ -9,12 +9,12 @@ contract EpochManagerTest is Test {
     EpochManager public epochManager;
     
     // Constants from LShared for easier reference
-    uint256 constant COMMIT_DURATION = 5;
-    uint256 constant REVEAL_DURATION = 5;
-    uint256 constant ELECT_DURATION = 5;
-    uint256 constant EXECUTE_DURATION = 5;
-    uint256 constant CONFIRM_DURATION = 15;
-    uint256 constant DISPUTE_DURATION = 5;
+    uint256 constant COMMIT_DURATION = 5 seconds;
+    uint256 constant REVEAL_DURATION = 5 seconds;
+    uint256 constant ELECT_DURATION = 5 seconds;
+    uint256 constant EXECUTE_DURATION = 5 seconds;
+    uint256 constant CONFIRM_DURATION = 15 seconds;
+    uint256 constant DISPUTE_DURATION = 5 seconds;
     uint256 constant EPOCH_DURATION = COMMIT_DURATION + REVEAL_DURATION + ELECT_DURATION + 
                                     EXECUTE_DURATION + CONFIRM_DURATION + DISPUTE_DURATION;
 
