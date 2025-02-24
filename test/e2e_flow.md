@@ -1,6 +1,5 @@
 ## End-to-end test flows:
 
-
 1. Node Lifecycle Flows:
    - Node Registration Flow:
      * Whitelisting CP
@@ -14,16 +13,35 @@
      * Complete withdrawal
      * Node unregistration
 
-2. Job Lifecycle Flow:
+2. Leader Election Flows:
+   - Successful Leader Election:
+     * Multiple nodes submit commitments
+     * Secrets revealed by all nodes
+     * Random seed generation
+     * Leader selection
+     * Leader validation for next phase
+
+   - Failed Leader Election:
+     * Missing commitments
+     * Invalid reveals
+     * Failed leader election
+     * System recovery
+
+   - Leader Transition:
+     * Multi-epoch leader changes
+     * Leader permissions across phases
+     * Handover between leaders
+
+3. Job Lifecycle Flow:
    - Job Submission:
      * Token deposit by job submitter
      * Job creation with parameters
      * Validation of pool requirements
 
    - Job Assignment:
-     * Leader election process
-     * Assignment round execution
+     * Leader initiates assignment round
      * Node selection and job distribution
+     * Assignment validation
 
    - Job Execution:
      * Node confirmation
@@ -31,7 +49,7 @@
      * Payment processing
      * Token transfers
 
-3. Epoch State Transition Flow:
+4. Epoch State Transition Flow:
    - Complete epoch cycle:
      * Commit phase with multiple nodes
      * Reveal phase participation
@@ -40,7 +58,7 @@
      * Confirm phase with job status updates
      * Dispute phase with penalties/rewards
 
-4. Incentive Flow:
+5. Incentive Flow:
    - Rewards:
      * Leader rewards for assignment
      * Node rewards for availability
