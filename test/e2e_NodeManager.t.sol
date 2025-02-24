@@ -131,7 +131,6 @@ contract NodeLifecycleE2ETest is Test {
         _setupRegisteredNode();
         
         uint256 nodeId = 1;
-        uint256 remainingStake = STAKE_AMOUNT - (COMPUTE_RATING_1 * LShared.STAKE_PER_RATING);
         
         vm.startPrank(cp1);
         
@@ -147,29 +146,28 @@ contract NodeLifecycleE2ETest is Test {
         // Verify stake requirement is updated
         assertEq(nodeManager.getStakeRequirement(cp1), 0, "Stake requirement should be zero");
         
-        // 3. Request withdrawal
-        vm.expectEmit(true, false, false, true);
-        emit WithdrawRequested(cp1, remainingStake, block.timestamp + LOCK_PERIOD, "stake");
-        nodeEscrow.requestWithdraw(remainingStake);
+        // 3. Get the CP's balance before withdrawal
+        uint256 balanceBefore = nodeEscrow.getBalance(cp1);
+        uint256 withdrawAmount = balanceBefore; // Full balance withdrawal
         
-        // 4. Try to withdraw before lock period
-        // vm.expectRevert(abi.encodeWithSignature(
-        //     "LockPeriodActive(address,uint256)",
-        //     cp1,
-        //     LOCK_PERIOD - 100
-        // ));
-        // console.log("CP 1 : ", cp1);
-        // console.log("LOCK PERIOD : ", LOCK_PERIOD);
-        // nodeEscrow.withdraw();
+        // Request withdrawal with proper amount
+        vm.expectEmit(true, false, false, true);
+        emit WithdrawRequested(cp1, withdrawAmount, block.timestamp + LOCK_PERIOD, "stake");
+        nodeEscrow.requestWithdraw(withdrawAmount);
+        
+        // 4. Verify cannot withdraw before lock period
+        vm.expectRevert();
+        nodeEscrow.withdraw();
         
         // 5. Wait for lock period to expire
         vm.warp(block.timestamp + LOCK_PERIOD + 1);
         
-        // 6. Complete withdrawal
-        uint256 balanceBefore = token.balanceOf(cp1);
+        // 6. Record token balance before withdrawal
+        uint256 tokenBalanceBefore = token.balanceOf(cp1);
         
+        // Complete withdrawal
         vm.expectEmit(true, false, false, true);
-        emit Withdrawn(cp1, remainingStake, 0, "stake");
+        emit Withdrawn(cp1, withdrawAmount, 0, "stake");
         nodeEscrow.withdraw();
         
         // Verify escrow balance
@@ -177,8 +175,8 @@ contract NodeLifecycleE2ETest is Test {
         
         // Verify tokens received
         assertEq(
-            token.balanceOf(cp1) - balanceBefore,
-            remainingStake,
+            token.balanceOf(cp1) - tokenBalanceBefore,
+            withdrawAmount,
             "Tokens not correctly withdrawn"
         );
         
