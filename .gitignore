@@ -14,10 +14,6 @@ broadcast/
 # python
 __pycache__/
 
-# Temporary files
-node_data/
-user_data/
-
 # Other
 .vscode
 .idea
