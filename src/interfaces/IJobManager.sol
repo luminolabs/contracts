@@ -30,6 +30,7 @@ interface IJobManager {
     event JobStatusUpdated(uint256 indexed jobId, JobStatus status);
     event JobAssigned(uint256 indexed jobId, uint256 indexed nodeId);
     event AssignmentRoundStarted(uint256 indexed epoch);
+    event JobTokensSet(uint256 indexed jobId, uint256 numTokens);
     event JobConfirmed(uint256 indexed jobId, uint256 indexed nodeId);
     event JobCompleted(uint256 indexed jobId, uint256 indexed nodeId);
     event JobRejected(uint256 indexed jobId, uint256 indexed nodeId, string reason);
@@ -39,6 +40,7 @@ interface IJobManager {
     function submitJob(string calldata jobArgs, string calldata base_model_name, uint256 requiredPool) external returns (uint256);
     function startAssignmentRound() external;
     function processPayment(uint256 jobId) external;
+    function setTokenCountForJob(uint256 jobId, uint256 numTokens) external;
     function confirmJob(uint256 jobId) external;
     function completeJob(uint256 jobId) external;
     function rejectJob(uint256 jobId, string calldata reason) external;
@@ -46,5 +48,8 @@ interface IJobManager {
     function getUnconfirmedJobs(uint256 epoch) external view returns (uint256[] memory);
     function getAssignedNode(uint256 jobId) external view returns (uint256);
     function getNodeInactivityEpochs(uint256 nodeId) external view returns (uint256);
-    function getJobsDetailsByNode(uint256 nodeId) external view returns (uint256[] memory, string[] memory);
+    function getJobsDetailsByNode(uint256 nodeId) external view returns (Job[] memory);
+    function getJobStatus(uint256 jobId) external view returns (JobStatus);
+    function getJobDetails(uint256 jobId) external view returns (Job memory);
+    function getJobsBySubmitter(address submitter) external view returns (uint256[] memory);
 }

@@ -32,9 +32,6 @@ contract JobManager is IJobManager {
     // Constants
     uint256 private constant MAX_JOBS_PER_NODE = 1;
 
-    /**
-     * @notice Initializes the JobManager contract
-     */
     constructor(
         address _nodeManager,
         address _leaderManager,
@@ -59,17 +56,17 @@ contract JobManager is IJobManager {
         jobCounter++;
         uint256 jobId = jobCounter;
 
-        // Initialize struct fields individually
-        Job storage job = jobs[jobId];
-        job.id = jobId;
-        job.submitter = msg.sender;
-        job.assignedNode = 0;
-        job.status = JobStatus.NEW;
-        job.requiredPool = requiredPool;
-        job.args = jobArgs;
-        job.base_model_name = base_model_name;
-        job.tokenCount = 0;
-        job.createdAt = block.timestamp;
+        jobs[jobId] = Job({
+            id: jobId,
+            submitter: msg.sender,
+            assignedNode: 0,
+            status: JobStatus.NEW,
+            requiredPool: requiredPool,
+            args: jobArgs,
+            base_model_name: base_model_name,
+            tokenCount: 0,
+            createdAt: block.timestamp
+        });
 
         jobsByStatus[JobStatus.NEW].push(jobId);
         submitterJobs[msg.sender].push(jobId);
@@ -141,6 +138,7 @@ contract JobManager is IJobManager {
         Job storage job = jobs[jobId];
         nodeManager.validateNodeOwner(job.assignedNode, msg.sender);
         job.tokenCount = numTokens;
+        emit JobTokensSet(jobId, numTokens);
     }
 
     /**
@@ -170,8 +168,21 @@ contract JobManager is IJobManager {
         nodeManager.validateNodeOwner(job.assignedNode, msg.sender);
         epochManager.validateEpochState(IEpochManager.State.CONFIRM);
 
+        // Update job status to COMPLETE
         updateJobStatus(jobId, JobStatus.COMPLETE);
-        emit JobCompleted(jobId, job.assignedNode);
+
+        // Remove job from nodeAssignments to make node eligible again
+        uint256 nodeId = job.assignedNode;
+        uint256[] storage assignments = nodeAssignments[nodeId];
+        for (uint256 i = 0; i < assignments.length; i++) {
+            if (assignments[i] == jobId) {
+                assignments[i] = assignments[assignments.length - 1];
+                assignments.pop();
+                break;
+            }
+        }
+
+        emit JobCompleted(jobId, nodeId);
     }
 
     /**
@@ -201,40 +212,34 @@ contract JobManager is IJobManager {
      * @notice Returns a list of unconfirmed jobs for a given epoch
      */
     function getUnconfirmedJobs(uint256 epoch) external view returns (uint256[] memory) {
-        uint256[] memory assignedJobs = assignedJobsByEpoch[epoch];
-        uint256[] memory confirmedJobs = jobsByStatus[JobStatus.CONFIRMED];
-
+        uint256[] storage assignedJobs = assignedJobsByEpoch[epoch];
         if (assignedJobs.length == 0) {
             return new uint256[](0);
         }
 
-        // First, count unconfirmed jobs
-        uint256 unconfirmedCount = 0;
+        // Use a temporary memory array to track unconfirmed status
+        bool[] memory isUnconfirmed = new bool[](assignedJobs.length);
+        uint256 unconfirmedCount = assignedJobs.length;
+
+        // Single pass to mark confirmed/completed jobs
         for (uint256 i = 0; i < assignedJobs.length; i++) {
-            bool isConfirmed = false;
-            for (uint256 j = 0; j < confirmedJobs.length; j++) {
-                if (assignedJobs[i] == confirmedJobs[j]) {
-                    isConfirmed = true;
-                    break;
-                }
-            }
-            if (!isConfirmed) {
-                unconfirmedCount++;
+            uint256 jobId = assignedJobs[i];
+            JobStatus status = jobs[jobId].status;
+            if (status == JobStatus.CONFIRMED || status == JobStatus.COMPLETE) {
+                isUnconfirmed[i] = false;
+                unconfirmedCount--;
+            } else {
+                isUnconfirmed[i] = true;
             }
         }
 
-        // Create fixed-size array and populate it
+        // Create result array with exact size
         uint256[] memory unconfirmedJobs = new uint256[](unconfirmedCount);
         uint256 currentIndex = 0;
+
+        // Single pass to populate result
         for (uint256 i = 0; i < assignedJobs.length; i++) {
-            bool isConfirmed = false;
-            for (uint256 j = 0; j < confirmedJobs.length; j++) {
-                if (assignedJobs[i] == confirmedJobs[j]) {
-                    isConfirmed = true;
-                    break;
-                }
-            }
-            if (!isConfirmed) {
+            if (isUnconfirmed[i]) {
                 unconfirmedJobs[currentIndex] = assignedJobs[i];
                 currentIndex++;
             }
@@ -283,16 +288,36 @@ contract JobManager is IJobManager {
     /**
      * @notice Returns a list of job IDs for a given node, and their corresponding arguments in json format
      */
-    function getJobsDetailsByNode(uint256 nodeId) external view returns (uint256[] memory, string[] memory) {
+    function getJobsDetailsByNode(uint256 nodeId) external view returns (Job[] memory) {
         uint256[] memory jobIds = nodeAssignments[nodeId];
-        string[] memory jobArgs = new string[](jobIds.length);
+        Job[] memory jobDetails = new Job[](jobIds.length);
 
         for (uint256 i = 0; i < jobIds.length; i++) {
-            jobIds[i] = jobs[jobIds[i]].id;
-            jobArgs[i] = jobs[jobIds[i]].args;
+            jobDetails[i] = jobs[jobIds[i]];
         }
 
-        return (jobIds, jobArgs);
+        return jobDetails;
+    }
+
+    /**
+     * @notice Returns a list of job IDs submitted by a given address
+     */
+    function getJobsBySubmitter(address submitter) external view returns (uint256[] memory) {
+        return submitterJobs[submitter];
+    }
+
+    /**
+     * @notice Returns the status of a job
+     */
+    function getJobStatus(uint256 jobId) external view returns (JobStatus) {
+        return jobs[jobId].status;
+    }
+
+    /**
+     * @notice Returns the details of a job
+     */
+    function getJobDetails(uint256 jobId) external view returns (Job memory) {
+        return jobs[jobId];
     }
 
     // Internal functions
@@ -301,9 +326,9 @@ contract JobManager is IJobManager {
         uint256 modelFeePerMillionTokens = 0;
         string memory model_name = job.base_model_name;
         if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_llama3_2_1b"))) {
-            modelFeePerMillionTokens = 1;
+            modelFeePerMillionTokens = 1 * 1e18;
         } else if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_llama3_1_8b"))) {
-            modelFeePerMillionTokens = 2;
+            modelFeePerMillionTokens = 2 * 1e18;
         } else {
             revert InvalidModelName(model_name);
         }
@@ -384,13 +409,14 @@ contract JobManager is IJobManager {
             for (uint256 j = 0; j < nodesWhoRevealed.length; j++) {
                 if (nodes[i] == nodesWhoRevealed[j]) {
                     revealedNodes[revealedCount] = nodes[i];
+                    revealedCount++;
                     break;
                 }
             }
         }
 
         uint256 eligibleCount = 0;
-        for (uint256 i = 0; i < revealedNodes.length; i++) {
+        for (uint256 i = 0; i < revealedCount; i++) {
             if (nodeAssignments[revealedNodes[i]].length < MAX_JOBS_PER_NODE) {
                 eligibleCount++;
             }
@@ -398,7 +424,7 @@ contract JobManager is IJobManager {
 
         uint256[] memory eligibleNodes = new uint256[](eligibleCount);
         uint256 currentIndex = 0;
-        for (uint256 i = 0; i < revealedNodes.length; i++) {
+        for (uint256 i = 0; i < revealedCount; i++) {
             if (nodeAssignments[revealedNodes[i]].length < MAX_JOBS_PER_NODE) {
                 eligibleNodes[currentIndex] = revealedNodes[i];
                 currentIndex++;

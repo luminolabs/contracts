@@ -9,7 +9,7 @@ import {LShared} from "./libraries/LShared.sol";
 
 contract NodeManager is INodeManager {
     // Contracts
-    INodeEscrow public immutable stakeEscrow;
+    INodeEscrow public immutable nodeEscrow;
     IAccessManager private immutable accessManager;
     IWhitelistManager private immutable whitelistManager;
 
@@ -21,11 +21,11 @@ contract NodeManager is INodeManager {
     mapping(address => uint256) private cpStakeRequirements;
 
     constructor(
-        address _stakeEscrow,
+        address _nodeEscrow,
         address _whitelistManager,
         address _accessManager
     ) {
-        stakeEscrow = INodeEscrow(_stakeEscrow);
+        nodeEscrow = INodeEscrow(_nodeEscrow);
         whitelistManager = IWhitelistManager(_whitelistManager);
         accessManager = IAccessManager(_accessManager);
     }
@@ -142,6 +142,6 @@ contract NodeManager is INodeManager {
         uint256 newRequirement = computeRating * LShared.STAKE_PER_RATING;
         uint256 totalRequired = currentRequirement + newRequirement;
 
-        stakeEscrow.requireBalance(cp, totalRequired);
+        nodeEscrow.requireBalance(cp, totalRequired);
     }
 }

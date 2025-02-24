@@ -2,6 +2,9 @@
 cache/
 out/
 
+# Node
+node_modules
+
 # Ignores broadcast logs
 broadcast/
 
@@ -11,24 +14,15 @@ broadcast/
 # python
 __pycache__/
 
-# Temporary files
-node_data/
-
 # Other
-.idea/
+.vscode
+.idea
 *.iml
 testnet.txt
+repomix-output.txt
 .DS_Store
+slither-results.sarif
+lcov.info
 
 # Docs
 docs/
-
-.vscode
-.idea
-
-slither-results.sarif
-
-node_modules
-lcov.info
-
-repomix-output.txt

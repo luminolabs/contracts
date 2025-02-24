@@ -12,7 +12,7 @@ contract LeaderManager is ILeaderManager {
     // Contracts
     IEpochManager public immutable epochManager;
     INodeManager public immutable nodeManager;
-    INodeEscrow public immutable stakeEscrow;
+    INodeEscrow public immutable nodeEscrow;
     IAccessManager public immutable accessManager;
     IWhitelistManager public immutable whitelistManager;
 
@@ -26,13 +26,13 @@ contract LeaderManager is ILeaderManager {
     constructor(
         address _epochManager,
         address _nodeManager,
-        address _stakeEscrow,
+        address _nodeEscrow,
         address _accessManager,
         address _whitelistManager
     ) {
         epochManager = IEpochManager(_epochManager);
         nodeManager = INodeManager(_nodeManager);
-        stakeEscrow = INodeEscrow(_stakeEscrow);
+        nodeEscrow = INodeEscrow(_nodeEscrow);
         accessManager = IAccessManager(_accessManager);
         whitelistManager = IWhitelistManager(_whitelistManager);
     }
@@ -83,7 +83,7 @@ contract LeaderManager is ILeaderManager {
         epochManager.validateEpochState(IEpochManager.State.ELECT);
         uint256 currentEpoch = epochManager.getCurrentEpoch();
         if (epochLeaders[currentEpoch] != 0) {
-            revert LeaderAlreadyElected(currentEpoch);
+            return epochLeaders[currentEpoch];
         }
         uint256[] memory nodeIds = nodeRevealsList[currentEpoch];
 
@@ -152,6 +152,6 @@ contract LeaderManager is ILeaderManager {
     function validateStakeAndWhitelist(address cp) internal view {
         whitelistManager.requireWhitelisted(cp);
         uint256 requiredStake = nodeManager.getStakeRequirement(cp);
-        stakeEscrow.requireBalance(cp, requiredStake);
+        nodeEscrow.requireBalance(cp, requiredStake);
     }
 }
