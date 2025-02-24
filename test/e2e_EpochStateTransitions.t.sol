@@ -277,20 +277,31 @@ contract EpochStateTransitionsE2ETest is Test {
         uint256 epoch2Leader = leaderManager.getCurrentLeader();
         address leader2 = nodeManager.getNodeOwner(epoch2Leader);
         
-        // 5. Verify leader changed
-        assertEq(epoch1Leader != epoch2Leader, true, "Leader should change between epochs");
-        
-        // 6. Move to execute phase in epoch 2
+        // 5. Verify leader permissions are properly assigned in epoch 2
+        // Whether it's the same leader or a new one, they should have valid permissions in epoch 2
         vm.warp(block.timestamp + LShared.ELECT_DURATION);
         
-        // 7. Use epoch 2 leader permissions
+        // 6. Verify current leader (epoch 2) has proper permissions
         vm.startPrank(leader2);
+        // This should succeed because leader2 is the current epoch's leader
         jobManager.startAssignmentRound();
         vm.stopPrank();
         
-        // 8. Try epoch 1 leader again (should still fail)
-        vm.startPrank(leader1);
-        vm.expectRevert(); // Will fail since leader1 is not the current leader
+        // 7. Verify that if leader1 is not the current leader, they cannot use leader permissions
+        if (leader1 != leader2) {
+            vm.startPrank(leader1);
+            vm.expectRevert(); // Will fail if leader1 is not the current leader
+            jobManager.startAssignmentRound();
+            vm.stopPrank();
+        }
+        
+        // 8. Move to next epoch (epoch 3)
+        vm.warp(LShared.EPOCH_DURATION * 2);
+        assertEq(epochManager.getCurrentEpoch(), 3, "Should be in epoch 3");
+        
+        // 9. Verify epoch 2 leader no longer has permissions in epoch 3
+        vm.startPrank(leader2);
+        vm.expectRevert();
         jobManager.startAssignmentRound();
         vm.stopPrank();
     }

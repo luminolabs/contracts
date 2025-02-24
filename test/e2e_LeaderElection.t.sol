@@ -237,7 +237,7 @@ contract LeaderElectionE2ETest is Test {
         return leaderId;
     }
 
-        function _verifyLeaderPermissions(uint256 leaderId) internal {
+    function _verifyLeaderPermissions(uint256 leaderId) internal {
         address leader = nodeManager.getNodeOwner(leaderId);
         
         // 1. Verify leader permissions in ELECT phase
@@ -246,15 +246,15 @@ contract LeaderElectionE2ETest is Test {
         vm.stopPrank();
 
         // 2. Test non-leader permissions
-        // address nonLeader = (leader == cp1) ? cp2 : cp1;
-        // vm.startPrank(nonLeader);
-        // vm.expectRevert(abi.encodeWithSignature(
-        //     "NotCurrentLeader(address,address)",
-        //     nonLeader,
-        //     leader
-        // ));
-        // leaderManager.validateLeader(nonLeader);
-        // vm.stopPrank();
+        address nonLeader = (leader == cp1) ? cp2 : cp1;
+        vm.startPrank(nonLeader);
+        vm.expectRevert(abi.encodeWithSignature(
+            "NotCurrentLeader(address,address)",
+            nonLeader,
+            leader
+        ));
+        leaderManager.validateLeader(nonLeader);
+        vm.stopPrank();
 
         // 3. Verify permissions in EXECUTE phase (should still be valid)
         vm.warp(block.timestamp + LShared.ELECT_DURATION);
@@ -262,14 +262,60 @@ contract LeaderElectionE2ETest is Test {
         leaderManager.validateLeader(leader);
         vm.stopPrank();
 
-        // 4. Verify permissions in CONFIRM phase (should be invalid)
-        // vm.warp(block.timestamp + LShared.EXECUTE_DURATION);
-        // vm.startPrank(leader);
-        // vm.expectRevert(abi.encodeWithSignature(
-        //     "InvalidState(uint8)",
-        //     uint8(IEpochManager.State.EXECUTE)  // We expect it to fail because we're no longer in EXECUTE phase
-        // ));
-        // leaderManager.validateLeader(leader);
-        // vm.stopPrank();
+        // 4. Move to next epoch and verify leader permissions from previous epoch are invalid
+        vm.warp(block.timestamp + LShared.EXECUTE_DURATION + LShared.CONFIRM_DURATION + LShared.DISPUTE_DURATION); // Move to next epoch
+        
+        
+        // Setup next epoch's leader election
+        uint256 nextEpochLeaderId = _setupNextEpochLeader();
+        address nextEpochLeader = nodeManager.getNodeOwner(nextEpochLeaderId);
+        
+        // Previous leader should not have validation privileges in new epoch if they are not the new leader
+        if (leader != nextEpochLeader) {
+            vm.startPrank(leader);
+            vm.expectRevert(abi.encodeWithSignature(
+                "NotCurrentLeader(address,address)",
+                leader,
+                nextEpochLeader
+            ));
+            leaderManager.validateLeader(leader);
+            vm.stopPrank();
+        }
+    }
+
+    function _setupNextEpochLeader() internal returns (uint256) {        
+        // Submit commitments for cp1 and cp2
+        vm.startPrank(cp1);
+        bytes memory secret1 = bytes(string(abi.encodePacked("nextEpochSecret1")));
+        bytes32 commitment1 = keccak256(secret1);
+        leaderManager.submitCommitment(nodeIds[0], commitment1);
+        vm.stopPrank();
+        
+        vm.startPrank(cp2);
+        bytes memory secret2 = bytes(string(abi.encodePacked("nextEpochSecret2")));
+        bytes32 commitment2 = keccak256(secret2);
+        leaderManager.submitCommitment(nodeIds[1], commitment2);
+        vm.stopPrank();
+        
+        // Move to reveal phase
+        vm.warp(block.timestamp + LShared.COMMIT_DURATION);
+        
+        // Reveal secrets
+        vm.startPrank(cp1);
+        leaderManager.revealSecret(nodeIds[0], secret1);
+        vm.stopPrank();
+        
+        vm.startPrank(cp2);
+        leaderManager.revealSecret(nodeIds[1], secret2);
+        vm.stopPrank();
+        
+        // Move to elect phase and elect leader
+        vm.warp(block.timestamp + LShared.REVEAL_DURATION);
+        uint256 nextLeaderId = leaderManager.electLeader();
+        
+        // Verify we have a leader for this epoch
+        assert(nextLeaderId > 0);
+        
+        return nextLeaderId;
     }
 }
