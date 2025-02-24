@@ -168,8 +168,21 @@ contract JobManager is IJobManager {
         nodeManager.validateNodeOwner(job.assignedNode, msg.sender);
         epochManager.validateEpochState(IEpochManager.State.CONFIRM);
 
+        // Update job status to COMPLETE
         updateJobStatus(jobId, JobStatus.COMPLETE);
-        emit JobCompleted(jobId, job.assignedNode);
+
+        // Remove job from nodeAssignments to make node eligible again
+        uint256 nodeId = job.assignedNode;
+        uint256[] storage assignments = nodeAssignments[nodeId];
+        for (uint256 i = 0; i < assignments.length; i++) {
+            if (assignments[i] == jobId) {
+                assignments[i] = assignments[assignments.length - 1];
+                assignments.pop();
+                break;
+            }
+        }
+
+        emit JobCompleted(jobId, nodeId);
     }
 
     /**

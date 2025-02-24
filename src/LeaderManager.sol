@@ -83,7 +83,7 @@ contract LeaderManager is ILeaderManager {
         epochManager.validateEpochState(IEpochManager.State.ELECT);
         uint256 currentEpoch = epochManager.getCurrentEpoch();
         if (epochLeaders[currentEpoch] != 0) {
-            revert LeaderAlreadyElected(currentEpoch);
+            return epochLeaders[currentEpoch];
         }
         uint256[] memory nodeIds = nodeRevealsList[currentEpoch];
 

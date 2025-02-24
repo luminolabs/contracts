@@ -61,7 +61,7 @@ contract JobManagerTest is Test {
         token = new LuminoToken();
         accessManager = new AccessManager();
         epochManager = new EpochManager();
-         nodeEscrow = new NodeEscrow(address(accessManager), address(token));
+        nodeEscrow = new NodeEscrow(address(accessManager), address(token));
         jobEscrow = new JobEscrow(address(accessManager), address(token));
         whitelistManager = new WhitelistManager(address(accessManager));
 
@@ -459,6 +459,46 @@ contract JobManagerTest is Test {
 
         assertEq(unconfirmedJobs.length, 1, "Should return only one unconfirmed job");
         assertEq(unconfirmedJobs[0], jobId3, "Should return only the ASSIGNED job");
+    }
+
+    function testNodeCanPickUpNewJobAfterCompletion() public {
+        // Setup: submit two jobs
+        vm.startPrank(jobSubmitter);
+        token.approve(address(jobEscrow), JOB_DEPOSIT * 2);
+        jobEscrow.deposit(JOB_DEPOSIT * 2);
+        uint256 jobId1 = jobManager.submitJob("job 1", MODEL_NAME, COMPUTE_RATING);
+        uint256 jobId2 = jobManager.submitJob("job 2", MODEL_NAME, COMPUTE_RATING);
+        vm.stopPrank();
+
+        // Assign first job
+        _setupAssignment();
+
+        // Get assigned node for job 1
+        uint256 assignedNode1 = jobManager.getAssignedNode(jobId1);
+        assertGt(assignedNode1, 0, "Job 1 should be assigned");
+        assertEq(jobManager.getAssignedNode(jobId2), 0, "Job 2 should not be assigned yet");
+
+        // Complete job 1
+        address nodeOwner = nodeManager.getNodeOwner(assignedNode1);
+        vm.warp(block.timestamp + LShared.EXECUTE_DURATION);
+        vm.startPrank(nodeOwner);
+        jobManager.confirmJob(jobId1);
+        jobManager.completeJob(jobId1);
+        vm.stopPrank();
+
+        // Move to next epoch and assign job 2
+        vm.warp(block.timestamp + LShared.EPOCH_DURATION);
+        _setupAssignment();
+
+        // Verify job 2 is now assigned to the same node
+        uint256 assignedNode2 = jobManager.getAssignedNode(jobId2);
+        assertGt(assignedNode2, 0, "Job 2 should be assigned after job 1 is completed");
+        assertEq(assignedNode2, assignedNode1, "Job 2 should be assigned to the same node");
+
+        // Verify nodeAssignments
+        IJobManager.Job[] memory nodeJobs = jobManager.getJobsDetailsByNode(assignedNode1);
+        assertEq(nodeJobs.length, 1, "Node should have only one active assignment");
+        assertEq(nodeJobs[0].id, jobId2, "Node should be assigned job 2");
     }
 
     // Helper function to setup job assignment
