@@ -54,6 +54,7 @@ contract JobLifecycleE2ETest is Test {
     event JobRejected(uint256 indexed jobId, uint256 indexed nodeId, string reason);
     event PaymentProcessed(uint256 indexed jobId, address indexed node, uint256 amount);
     event PaymentReleased(address indexed from, address indexed to, uint256 amount);
+    event JobTokensSet(uint256 indexed jobId, uint256 numTokens);
 
     function setUp() public {
         vm.startPrank(admin);
@@ -160,6 +161,10 @@ contract JobLifecycleE2ETest is Test {
         
         jobManager.confirmJob(jobId);
         
+        // Verify job status
+        assertEq(uint256(jobManager.getJobStatus(jobId)), uint256(IJobManager.JobStatus.CONFIRMED), 
+                "Job status should be CONFIRMED");
+        
         // 4. Complete job and set token count
         uint256 tokenCount = 1000000; // 1M tokens for model fee calculation
         
@@ -167,15 +172,23 @@ contract JobLifecycleE2ETest is Test {
         emit JobCompleted(jobId, assignedNodeId);
         
         jobManager.completeJob(jobId);
+        
+        vm.expectEmit(true, false, false, true);
+        emit JobTokensSet(jobId, tokenCount);
+        
         jobManager.setTokenCountForJob(jobId, tokenCount);
         
         vm.stopPrank();
+        
+        // Verify job status
+        assertEq(uint256(jobManager.getJobStatus(jobId)), uint256(IJobManager.JobStatus.COMPLETE), 
+                "Job status should be COMPLETE");
         
         // 5. Process payment
         uint256 nodeOwnerInitialBalance = jobEscrow.getBalance(assignedNodeOwner);
         
         // Calculate expected payment based on model fee
-        uint256 expectedPayment = 2; // MODEL_NAME_1 has fee of 2 per 1M tokens
+        uint256 expectedPayment = 2 ether; // MODEL_NAME_1 has fee of 2 per 1M tokens
         
         vm.expectEmit(true, true, false, true);
         emit PaymentProcessed(jobId, assignedNodeOwner, expectedPayment);
@@ -236,6 +249,8 @@ contract JobLifecycleE2ETest is Test {
         
         // 4. Verify job status reset
         assertEq(jobManager.getAssignedNode(jobId), 0, "Job should be unassigned after rejection");
+        assertEq(uint256(jobManager.getJobStatus(jobId)), uint256(IJobManager.JobStatus.NEW), 
+                "Job status should be reset to NEW");
     }
 
     function testMultipleJobsAssignment() public {
@@ -270,14 +285,11 @@ contract JobLifecycleE2ETest is Test {
         }
         
         // 4. Get jobs by node
-        // address nodeOwner = nodeManager.getNodeOwner(1);
-        // vm.startPrank(nodeOwner);
-        // (uint256[] memory assignedJobIds, string[] memory jobArgs) = jobManager.getJobsDetailsByNode(1);
+        uint256 nodeId = jobManager.getAssignedNode(jobIds[0]);
+        IJobManager.Job[] memory nodeJobs = jobManager.getJobsDetailsByNode(nodeId);
         
-        // // Verify node has assigned jobs
-        // assertTrue(assignedJobIds.length > 0, "Node should have assigned jobs");
-        // assertEq(assignedJobIds.length, jobArgs.length, "Job IDs and args arrays should match");
-        // vm.stopPrank();
+        // Verify node has assigned jobs
+        assertTrue(nodeJobs.length > 0, "Node should have assigned jobs");
     }
 
     function testDifferentModelFees() public {
@@ -334,8 +346,8 @@ contract JobLifecycleE2ETest is Test {
         
         // MODEL_NAME_1 fee is 2 per 1M tokens
         // MODEL_NAME_2 fee is 1 per 1M tokens
-        assertEq(payment1, 2, "Payment for MODEL_NAME_1 should be 2");
-        assertEq(payment2, 1, "Payment for MODEL_NAME_2 should be 1");
+        assertEq(payment1, 2 ether, "Payment for MODEL_NAME_1 should be 2 ether");
+        assertEq(payment2, 1 ether, "Payment for MODEL_NAME_2 should be 1 ether");
     }
 
     function testInvalidJobStatusTransitions() public {
@@ -350,13 +362,13 @@ contract JobLifecycleE2ETest is Test {
         vm.startPrank(cp1);
         vm.warp(block.timestamp + LShared.COMMIT_DURATION + LShared.REVEAL_DURATION + LShared.ELECT_DURATION + LShared.EXECUTE_DURATION);
         
-        vm.expectRevert();
+        vm.expectRevert(); // Will revert due to invalid state transition or validation
         jobManager.confirmJob(jobId);
         vm.stopPrank();
         
         // 3. Try to complete job before confirmation
         vm.startPrank(cp1);
-        vm.expectRevert();
+        vm.expectRevert(); // Will revert due to invalid state transition or validation
         jobManager.completeJob(jobId);
         vm.stopPrank();
         
@@ -375,6 +387,7 @@ contract JobLifecycleE2ETest is Test {
         vm.startPrank(assignedNodeOwner);
         vm.warp(block.timestamp + LShared.EXECUTE_DURATION);
         
+        // Trying to complete without confirming first should fail
         vm.expectRevert(abi.encodeWithSignature(
             "InvalidJobStatus(uint256,uint8,uint8)",
             jobId,
@@ -417,6 +430,84 @@ contract JobLifecycleE2ETest is Test {
         // Active node should have 0 inactivity epochs
         uint256 inactivityEpochs = jobManager.getNodeInactivityEpochs(assignedNodeId);
         assertEq(inactivityEpochs, 0, "Active node should have 0 inactivity epochs");
+    }
+
+    function testUnconfirmedJobs() public {
+        // 1. Submit multiple jobs
+        vm.startPrank(jobSubmitter);
+        token.approve(address(jobEscrow), JOB_DEPOSIT * 3);
+        jobEscrow.deposit(JOB_DEPOSIT * 3);
+        
+        uint256 jobId1 = jobManager.submitJob("job 1", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId2 = jobManager.submitJob("job 2", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId3 = jobManager.submitJob("job 3", MODEL_NAME_1, COMPUTE_RATING);
+        vm.stopPrank();
+        
+        // 2. Assign jobs
+        address leader = nodeManager.getNodeOwner(leaderManager.getCurrentLeader());
+        
+        vm.startPrank(leader);
+        vm.warp(block.timestamp + LShared.COMMIT_DURATION + LShared.REVEAL_DURATION + LShared.ELECT_DURATION);
+        jobManager.startAssignmentRound();
+        vm.stopPrank();
+        
+        // 3. Confirm one job, complete another, leave the third unconfirmed
+        vm.warp(block.timestamp + LShared.EXECUTE_DURATION);
+        
+        uint256 nodeId1 = jobManager.getAssignedNode(jobId1);
+        address nodeOwner1 = nodeManager.getNodeOwner(nodeId1);
+        
+        vm.startPrank(nodeOwner1);
+        jobManager.confirmJob(jobId1);
+        vm.stopPrank();
+        
+        uint256 nodeId2 = jobManager.getAssignedNode(jobId2);
+        address nodeOwner2 = nodeManager.getNodeOwner(nodeId2);
+        
+        vm.startPrank(nodeOwner2);
+        jobManager.confirmJob(jobId2);
+        jobManager.completeJob(jobId2);
+        vm.stopPrank();
+        
+        // 4. Get unconfirmed jobs
+        uint256[] memory unconfirmedJobs = jobManager.getUnconfirmedJobs(epochManager.getCurrentEpoch());
+        
+        // Job3 should be the only unconfirmed job
+        assertEq(unconfirmedJobs.length, 1, "Should be one unconfirmed job");
+        assertEq(unconfirmedJobs[0], jobId3, "Unconfirmed job should be job 3");
+    }
+
+    function testInvalidModelName() public {
+        // 1. Submit job with invalid model name
+        vm.startPrank(jobSubmitter);
+        token.approve(address(jobEscrow), JOB_DEPOSIT);
+        jobEscrow.deposit(JOB_DEPOSIT);
+        
+        uint256 jobId = jobManager.submitJob("test job", "invalid_model", COMPUTE_RATING);
+        vm.stopPrank();
+        
+        // 2. Assign job
+        address leader = nodeManager.getNodeOwner(leaderManager.getCurrentLeader());
+        
+        vm.startPrank(leader);
+        vm.warp(block.timestamp + LShared.COMMIT_DURATION + LShared.REVEAL_DURATION + LShared.ELECT_DURATION);
+        jobManager.startAssignmentRound();
+        vm.stopPrank();
+        
+        // 3. Complete job
+        uint256 assignedNodeId = jobManager.getAssignedNode(jobId);
+        address assignedNodeOwner = nodeManager.getNodeOwner(assignedNodeId);
+        
+        vm.warp(block.timestamp + LShared.EXECUTE_DURATION);
+        vm.startPrank(assignedNodeOwner);
+        jobManager.confirmJob(jobId);
+        jobManager.completeJob(jobId);
+        jobManager.setTokenCountForJob(jobId, 1000000); // 1M tokens
+        vm.stopPrank();
+        
+        // 4. Process payment - should revert due to invalid model name
+        vm.expectRevert(abi.encodeWithSignature("InvalidModelName(string)", "invalid_model"));
+        jobManager.processPayment(jobId);
     }
 
     // Helper Functions
