@@ -166,7 +166,7 @@ contract AccessManagerTest is Test {
 
         vm.startPrank(operator);
         // Should revert when trying to renounce for different address
-        vm.expectRevert("Must confirm renounce");
+        vm.expectRevert(abi.encodeWithSignature("MustConfirmRenounce(address)", operator));
         accessManager.renounceRole(LShared.OPERATOR_ROLE, admin);
         vm.stopPrank();
     }
