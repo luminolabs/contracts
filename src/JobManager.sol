@@ -320,6 +320,8 @@ contract JobManager is IJobManager {
     function calculateJobPayment(Job storage job) internal view returns (uint256) {
         uint256 modelFeePerMillionTokens = 0;
         string memory model_name = job.base_model_name;
+
+        // Assign fee per million tokens based on model name
         if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_llama3_2_1b"))) {
             modelFeePerMillionTokens = 1 * 1e18;
         } else if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_llama3_1_8b"))) {
@@ -330,8 +332,9 @@ contract JobManager is IJobManager {
             revert InvalidModelName(model_name);
         }
 
-        uint256 tokensInMillions = job.tokenCount / 1e6;
-        return modelFeePerMillionTokens * tokensInMillions;
+        // Calculate payment with fixed-point precision
+        uint256 payment = (modelFeePerMillionTokens * job.tokenCount) / 1e6;
+        return payment;
     }
 
     function assignNodeToJob(uint256 jobId, uint256 nodeId) internal {
