@@ -51,7 +51,6 @@ contract JobLifecycleE2ETest is Test {
     event AssignmentRoundStarted(uint256 indexed epoch);
     event JobConfirmed(uint256 indexed jobId, uint256 indexed nodeId);
     event JobCompleted(uint256 indexed jobId, uint256 indexed nodeId);
-    event JobRejected(uint256 indexed jobId, uint256 indexed nodeId, string reason);
     event PaymentProcessed(uint256 indexed jobId, address indexed node, uint256 amount);
     event PaymentReleased(address indexed from, address indexed to, uint256 amount);
     event JobTokensSet(uint256 indexed jobId, uint256 numTokens);
@@ -212,47 +211,6 @@ contract JobLifecycleE2ETest is Test {
         );
     }
 
-    function testJobRejection() public {
-        // 1. Submit job
-        vm.startPrank(jobSubmitter);
-        token.approve(address(jobEscrow), JOB_DEPOSIT);
-        jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob(
-            "test job args",
-            MODEL_NAME_1,
-            COMPUTE_RATING
-        );
-        vm.stopPrank();
-        
-        // 2. Assign job
-        address leader = nodeManager.getNodeOwner(leaderManager.getCurrentLeader());
-        
-        vm.startPrank(leader);
-        vm.warp(block.timestamp + LShared.COMMIT_DURATION + LShared.REVEAL_DURATION + LShared.ELECT_DURATION);
-        jobManager.startAssignmentRound();
-        vm.stopPrank();
-        
-        // 3. Reject job
-        uint256 assignedNodeId = jobManager.getAssignedNode(jobId);
-        address assignedNodeOwner = nodeManager.getNodeOwner(assignedNodeId);
-        
-        vm.startPrank(assignedNodeOwner);
-        vm.warp(block.timestamp + LShared.EXECUTE_DURATION);
-        
-        string memory rejectionReason = "Insufficient resources";
-        
-        vm.expectEmit(true, true, false, true);
-        emit JobRejected(jobId, assignedNodeId, rejectionReason);
-        
-        jobManager.rejectJob(jobId, rejectionReason);
-        vm.stopPrank();
-        
-        // 4. Verify job status reset
-        assertEq(jobManager.getAssignedNode(jobId), 0, "Job should be unassigned after rejection");
-        assertEq(uint256(jobManager.getJobStatus(jobId)), uint256(IJobManager.JobStatus.NEW), 
-                "Job status should be reset to NEW");
-    }
-
     function testMultipleJobsAssignment() public {
         // 1. Submit multiple jobs
         uint256[] memory jobIds = new uint256[](3);
@@ -389,8 +347,7 @@ contract JobLifecycleE2ETest is Test {
         
         // Trying to complete without confirming first should fail
         vm.expectRevert(abi.encodeWithSignature(
-            "InvalidJobStatus(uint256,uint8,uint8)",
-            jobId,
+            "InvalidStatusTransition(uint8,uint8)",
             uint8(IJobManager.JobStatus.ASSIGNED),
             uint8(IJobManager.JobStatus.CONFIRMED)
         ));

@@ -147,9 +147,6 @@ contract JobManager is IJobManager {
     function confirmJob(uint256 jobId) external {
         epochManager.validateEpochState(IEpochManager.State.CONFIRM);
         Job storage job = jobs[jobId];
-        if (job.status != JobStatus.ASSIGNED) {
-            revert InvalidJobStatus(jobId, job.status, JobStatus.ASSIGNED);
-        }
         nodeManager.validateNodeOwner(job.assignedNode, msg.sender);
         epochManager.validateEpochState(IEpochManager.State.CONFIRM);
 
@@ -162,43 +159,28 @@ contract JobManager is IJobManager {
      */
     function completeJob(uint256 jobId) external {
         Job storage job = jobs[jobId];
-        if (job.status != JobStatus.CONFIRMED) {
-            revert InvalidJobStatus(jobId, job.status, JobStatus.CONFIRMED);
-        }
         nodeManager.validateNodeOwner(job.assignedNode, msg.sender);
-        epochManager.validateEpochState(IEpochManager.State.CONFIRM);
 
-        // Update job status to COMPLETE
         updateJobStatus(jobId, JobStatus.COMPLETE);
 
         // Remove job from nodeAssignments to make node eligible again
-        uint256 nodeId = job.assignedNode;
-        uint256[] storage assignments = nodeAssignments[nodeId];
-        for (uint256 i = 0; i < assignments.length; i++) {
-            if (assignments[i] == jobId) {
-                assignments[i] = assignments[assignments.length - 1];
-                assignments.pop();
-                break;
-            }
-        }
+        removeJobFromNodeAssignments(jobId);
 
-        emit JobCompleted(jobId, nodeId);
+        emit JobCompleted(jobId, job.assignedNode);
     }
 
     /**
-     * @notice Reject an assigned job
+     * @notice Mark a job as failed and prevent rescheduling
      */
-    function rejectJob(uint256 jobId, string calldata reason) external {
+    function failJob(uint256 jobId, string calldata reason) external {
         Job storage job = jobs[jobId];
-        if (job.status != JobStatus.ASSIGNED) {
-            revert InvalidJobStatus(jobId, job.status, JobStatus.ASSIGNED);
-        }
         nodeManager.validateNodeOwner(job.assignedNode, msg.sender);
-        epochManager.validateEpochState(IEpochManager.State.CONFIRM);
 
-        uint256 nodeId = job.assignedNode;
-        resetJobAssignment(jobId);
-        emit JobRejected(jobId, nodeId, reason);
+        // Remove job from nodeAssignments to make node eligible again
+        removeJobFromNodeAssignments(jobId);
+
+        updateJobStatus(jobId, JobStatus.FAILED);
+        emit JobFailed(jobId, job.assignedNode, reason);
     }
 
     /**
@@ -322,6 +304,19 @@ contract JobManager is IJobManager {
 
     // Internal functions
 
+    function removeJobFromNodeAssignments(uint256 jobId) internal {
+        Job storage job = jobs[jobId];
+        uint256 nodeId = job.assignedNode;
+        uint256[] storage assignments = nodeAssignments[nodeId];
+        for (uint256 i = 0; i < assignments.length; i++) {
+            if (assignments[i] == jobId) {
+                assignments[i] = assignments[assignments.length - 1];
+                assignments.pop();
+                break;
+            }
+        }
+    }
+
     function calculateJobPayment(Job storage job) internal view returns (uint256) {
         uint256 modelFeePerMillionTokens = 0;
         string memory model_name = job.base_model_name;
@@ -329,6 +324,8 @@ contract JobManager is IJobManager {
             modelFeePerMillionTokens = 1 * 1e18;
         } else if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_llama3_1_8b"))) {
             modelFeePerMillionTokens = 2 * 1e18;
+        } else if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_dummy"))) {
+            modelFeePerMillionTokens = 1 * 1e18;
         } else {
             revert InvalidModelName(model_name);
         }
@@ -366,26 +363,6 @@ contract JobManager is IJobManager {
         jobsByStatus[newStatus].push(jobId);
 
         emit JobStatusUpdated(jobId, newStatus);
-    }
-
-    function resetJobAssignment(uint256 jobId) internal {
-        Job storage job = jobs[jobId];
-        uint256 nodeId = job.assignedNode;
-
-        removeFromStatusArray(jobId, job.status);
-        job.status = JobStatus.NEW;
-        job.assignedNode = 0;
-        jobAssigned[jobId] = false;
-        jobsByStatus[JobStatus.NEW].push(jobId);
-
-        uint256[] storage assignments = nodeAssignments[nodeId];
-        for (uint256 i = 0; i < assignments.length; i++) {
-            if (assignments[i] == jobId) {
-                assignments[i] = assignments[assignments.length - 1];
-                assignments.pop();
-                break;
-            }
-        }
     }
 
     function removeFromStatusArray(uint256 jobId, JobStatus status) internal {
@@ -437,7 +414,7 @@ contract JobManager is IJobManager {
     function isValidStatusTransition(JobStatus from, JobStatus to) internal pure returns (bool) {
         if (from == JobStatus.NEW) return to == JobStatus.ASSIGNED;
         if (from == JobStatus.ASSIGNED) return to == JobStatus.CONFIRMED;
-        if (from == JobStatus.CONFIRMED) return to == JobStatus.COMPLETE;
+        if (from == JobStatus.CONFIRMED) return to == JobStatus.COMPLETE || to == JobStatus.FAILED;
         return false;
     }
 }

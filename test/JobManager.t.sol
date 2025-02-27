@@ -48,7 +48,6 @@ contract JobManagerTest is Test {
     event AssignmentRoundStarted(uint256 indexed epoch);
     event JobConfirmed(uint256 indexed jobId, uint256 indexed nodeId);
     event JobCompleted(uint256 indexed jobId, uint256 indexed nodeId);
-    event JobRejected(uint256 indexed jobId, uint256 indexed nodeId, string reason);
     event PaymentProcessed(uint256 indexed jobId, address indexed node, uint256 amount);
     event JobTokensSet(uint256 indexed jobId, uint256 numTokens);
 
@@ -392,8 +391,7 @@ contract JobManagerTest is Test {
         // Try to complete without confirming first
         vm.startPrank(nodeOwner);
         vm.expectRevert(abi.encodeWithSignature(
-            "InvalidJobStatus(uint256,uint8,uint8)",
-            jobId,
+            "InvalidStatusTransition(uint8,uint8)",
             uint8(IJobManager.JobStatus.ASSIGNED),
             uint8(IJobManager.JobStatus.CONFIRMED)
         ));
@@ -429,43 +427,6 @@ contract JobManagerTest is Test {
         // Verify token count
         IJobManager.Job memory job = jobManager.getJobDetails(jobId);
         assertEq(job.tokenCount, tokenCount, "Token count should be set");
-    }
-
-    function testRejectJob() public {
-        // Setup: submit and assign job
-        vm.startPrank(jobSubmitter);
-        token.approve(address(jobEscrow), JOB_DEPOSIT);
-        jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, COMPUTE_RATING);
-        vm.stopPrank();
-
-        _setupAssignment();
-
-        // Get assigned node
-        uint256 assignedNode = jobManager.getAssignedNode(jobId);
-        address nodeOwner = nodeManager.getNodeOwner(assignedNode);
-
-        // Move to confirm phase
-        vm.warp(block.timestamp + LShared.EXECUTE_DURATION);
-
-        vm.startPrank(nodeOwner);
-
-        // Test event emission
-        vm.expectEmit(true, true, false, true);
-        emit JobRejected(jobId, assignedNode, "Test rejection");
-
-        // Reject job
-        jobManager.rejectJob(jobId, "Test rejection");
-
-        // Verify assignment was reset
-        assertEq(jobManager.getAssignedNode(jobId), 0, "Job should no longer be assigned");
-        assertEq(
-            uint256(jobManager.getJobStatus(jobId)), 
-            uint256(IJobManager.JobStatus.NEW), 
-            "Job status should be reset to NEW"
-        );
-
-        vm.stopPrank();
     }
 
     function testProcessPayment() public {
