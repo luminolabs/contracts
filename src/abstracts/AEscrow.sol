@@ -34,14 +34,23 @@ abstract contract AEscrow is IEscrow {
     /**
      * @notice Allows deposits into escrow
      */
-    function deposit(uint256 amount) external {
+    function deposit(uint256 amount) public virtual {
         if (amount < MIN_DEPOSIT) {
             revert BelowMinimumDeposit(amount, MIN_DEPOSIT);
         }
 
+        deposit_validation();
+
         token.transferFrom(msg.sender, address(this), amount);
         balances[msg.sender] += amount;
         emit Deposited(msg.sender, amount, balances[msg.sender], getEscrowName());
+    }
+
+    /**
+     * @notice Hook for child contract to add custom validation
+     */
+    function deposit_validation() internal virtual {
+        // This function is a hook for the child contract to add custom validation
     }
 
     /**
