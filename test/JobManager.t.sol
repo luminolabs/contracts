@@ -393,7 +393,7 @@ contract JobManagerTest is Test {
         vm.expectRevert(abi.encodeWithSignature(
             "InvalidStatusTransition(uint8,uint8)",
             uint8(IJobManager.JobStatus.ASSIGNED),
-            uint8(IJobManager.JobStatus.CONFIRMED)
+            uint8(IJobManager.JobStatus.COMPLETE)
         ));
         jobManager.completeJob(jobId);
         vm.stopPrank();
