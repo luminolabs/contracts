@@ -12,7 +12,7 @@ contract NodeEscrow is AEscrow, INodeEscrow {
     // State variables
     mapping(address => bool) private slashedCPs;
 
-    function deposit_validation() internal override {
+    function deposit_validation() internal view override {
         if (slashedCPs[msg.sender]) {
             revert SlashedCP(msg.sender);
         }
