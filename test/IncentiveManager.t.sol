@@ -144,8 +144,20 @@ contract IncentiveManagerTest is Test {
         uint256 leaderId = _setupEpochAndLeader();
         address leader = nodeManager.getNodeOwner(leaderId);
         
+        // Make sure the leader has enough stake
+        vm.startPrank(leader);
+        uint256 stakeAmount = 100 ether; // Plenty of stake
+        token.approve(address(nodeEscrow), stakeAmount);
+        nodeEscrow.deposit(stakeAmount);
+        vm.stopPrank();
+        
+        // Verify the leader's balance
+        uint256 initialBalance = nodeEscrow.getBalance(leader);
+        
         // Move to execute phase
         vm.warp(block.timestamp + LShared.ELECT_DURATION);
+        (IEpochManager.State state, ) = epochManager.getEpochState();
+        assertEq(uint256(state), uint256(IEpochManager.State.EXECUTE), "Not in EXECUTE state");
         
         // Setup and assign job
         vm.startPrank(jobSubmitter);
@@ -157,21 +169,41 @@ contract IncentiveManagerTest is Test {
         vm.prank(leader);
         jobManager.startAssignmentRound();
         
-        // Get initial balance
+        // Move to confirm phase
+        vm.warp(block.timestamp + LShared.EXECUTE_DURATION);
+        (state, ) = epochManager.getEpochState();
+        assertEq(uint256(state), uint256(IEpochManager.State.CONFIRM), "Not in CONFIRM state");
+        
+        // Confirm job to avoid penalty
+        uint256 jobId = 1;
+        uint256 assignedNodeId = jobManager.getAssignedNode(jobId);
+        assertEq(assignedNodeId, leaderId, "Job should be assigned to leader's node");
+        
+        vm.prank(leader);
+        jobManager.confirmJob(jobId);
+        
+        // Get balance before dispute phase
         uint256 leaderBalanceBefore = nodeEscrow.getBalance(leader);
         
         // Move to dispute phase for processing
-        vm.warp(block.timestamp + LShared.EXECUTE_DURATION + LShared.CONFIRM_DURATION);
+        vm.warp(block.timestamp + LShared.CONFIRM_DURATION);
+        (state, ) = epochManager.getEpochState();
+        assertEq(uint256(state), uint256(IEpochManager.State.DISPUTE), "Not in DISPUTE state");
         
-        // Process rewards
+        // Process rewards with a different address (not the leader)
+        vm.prank(cp2);
         incentiveManager.processAll();
         
-        // Verify leader reward
-        assertEq(
-            nodeEscrow.getBalance(leader) - leaderBalanceBefore,
-            LShared.LEADER_REWARD,
-            "Leader reward not applied correctly"
-        );
+        // Check final balance and calculate expected increase
+        uint256 leaderBalanceAfter = nodeEscrow.getBalance(leader);
+        uint256 balanceChange = leaderBalanceAfter - leaderBalanceBefore;
+        
+        // Expected change: LEADER_REWARD + JOB_AVAILABILITY_REWARD (since leader revealed)
+        // Leader doesn't get the DISPUTER_REWARD since cp2 called processAll
+        uint256 expectedChange = LShared.LEADER_REWARD + LShared.JOB_AVAILABILITY_REWARD;
+        
+        // Verify the correct rewards were applied
+        assertEq(balanceChange, expectedChange, "Leader should receive both leader and availability rewards");
     }
 
     function testJobAvailabilityReward() public {
