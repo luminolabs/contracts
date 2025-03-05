@@ -43,11 +43,15 @@ contract NodeLifecycleE2ETest is Test {
         
         // Deploy contracts
         token = new LuminoToken();
+        token.initialize();
         accessManager = new AccessManager();
-        nodeEscrow = new NodeEscrow(address(accessManager), address(token));
-        whitelistManager = new WhitelistManager(address(accessManager));
-        
-        nodeManager = new NodeManager(
+        accessManager.initialize();
+        nodeEscrow = new NodeEscrow();
+        nodeEscrow.initialize(address(accessManager), address(token));
+        whitelistManager = new WhitelistManager();
+        whitelistManager.initialize(address(accessManager));
+        nodeManager = new NodeManager();
+        nodeManager.initialize(
             address(nodeEscrow),
             address(whitelistManager),
             address(accessManager)

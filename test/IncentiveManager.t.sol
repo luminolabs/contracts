@@ -52,19 +52,26 @@ contract IncentiveManagerTest is Test {
         
         // Deploy contracts
         token = new LuminoToken();
+        token.initialize();
         accessManager = new AccessManager();
+        accessManager.initialize();
         epochManager = new EpochManager();
-        nodeEscrow = new NodeEscrow(address(accessManager), address(token));
-        jobEscrow = new JobEscrow(address(accessManager), address(token));
-        whitelistManager = new WhitelistManager(address(accessManager));
+        nodeEscrow = new NodeEscrow();
+        nodeEscrow.initialize(address(accessManager), address(token));
+        jobEscrow = new JobEscrow();
+        jobEscrow.initialize(address(accessManager), address(token));
+        whitelistManager = new WhitelistManager();
+        whitelistManager.initialize(address(accessManager));
         
-        nodeManager = new NodeManager(
+        nodeManager = new NodeManager();
+        nodeManager.initialize(
             address(nodeEscrow),
             address(whitelistManager),
             address(accessManager)
         );
         
-        leaderManager = new LeaderManager(
+        leaderManager = new LeaderManager();
+        leaderManager.initialize(
             address(epochManager),
             address(nodeManager),
             address(nodeEscrow),
@@ -72,7 +79,8 @@ contract IncentiveManagerTest is Test {
             address(whitelistManager)
         );
         
-        jobManager = new JobManager(
+        jobManager = new JobManager();
+        jobManager.initialize(
             address(nodeManager),
             address(leaderManager),
             address(epochManager),
@@ -80,7 +88,8 @@ contract IncentiveManagerTest is Test {
             address(accessManager)
         );
         
-        incentiveManager = new IncentiveManager(
+        incentiveManager = new IncentiveManager();
+        incentiveManager.initialize(
             address(epochManager),
             address(leaderManager),
             address(jobManager),

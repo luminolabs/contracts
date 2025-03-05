@@ -40,16 +40,22 @@ contract LeaderManagerTest is Test {
         
         // Deploy contracts
         token = new LuminoToken();
+        token.initialize();
         accessManager = new AccessManager();
+        accessManager.initialize();
         epochManager = new EpochManager();
-        nodeEscrow = new NodeEscrow(address(accessManager), address(token));
-        whitelistManager = new WhitelistManager(address(accessManager));
-        nodeManager = new NodeManager(
+        nodeEscrow = new NodeEscrow();
+        nodeEscrow.initialize(address(accessManager), address(token));
+        whitelistManager = new WhitelistManager();
+        whitelistManager.initialize(address(accessManager));
+        nodeManager = new NodeManager();
+        nodeManager.initialize(
             address(nodeEscrow),
             address(whitelistManager),
             address(accessManager)
         );
-        leaderManager = new LeaderManager(
+        leaderManager = new LeaderManager();
+        leaderManager.initialize(
             address(epochManager),
             address(nodeManager),
             address(nodeEscrow),

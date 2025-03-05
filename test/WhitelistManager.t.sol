@@ -24,7 +24,9 @@ contract WhitelistManagerTest is Test {
         // Deploy contracts
         vm.startPrank(admin);
         accessManager = new AccessManager();
-        whitelistManager = new WhitelistManager(address(accessManager));
+        accessManager.initialize();
+        whitelistManager = new WhitelistManager();
+        whitelistManager.initialize(address(accessManager));
         
         // Setup roles
         accessManager.grantRole(LShared.OPERATOR_ROLE, operator);
