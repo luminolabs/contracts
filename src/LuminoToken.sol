@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import {ERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "../lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import {ERC20Upgradeable} from "../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
 
 
-contract LuminoToken is ERC20, Ownable {
+contract LuminoToken is Initializable, ERC20Upgradeable, OwnableUpgradeable {
     uint8 private constant DECIMALS = 18;
     uint256 private constant INITIAL_SUPPLY = 100_000_000; // 100 million tokens
 
-    constructor() ERC20("Lumino", "LUM") Ownable(msg.sender) {
+     function initialize() external initializer {
+        __ERC20_init("Lumino", "LUM");
+        __Ownable_init(msg.sender);
         _mint(msg.sender, INITIAL_SUPPLY * (10 ** decimals()));
     }
 

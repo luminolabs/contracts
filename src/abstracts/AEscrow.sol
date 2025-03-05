@@ -2,18 +2,19 @@
 pragma solidity ^0.8.17;
 
 import {LuminoToken} from "../LuminoToken.sol";
+import {Initializable} from "../../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import {IAccessManager} from "../interfaces/IAccessManager.sol";
 import {IEscrow} from "../interfaces/IEscrow.sol";
 
-abstract contract AEscrow is IEscrow {
+abstract contract AEscrow is Initializable, IEscrow {
     // Constants
     uint256 public constant LOCK_PERIOD = 1 days;
     uint256 public constant MIN_DEPOSIT = 0.1 ether;
     uint256 public constant MIN_BALANCE = 0.01 ether;
 
     // Contracts
-    IAccessManager internal immutable accessManager;
-    LuminoToken internal immutable token;
+    IAccessManager internal accessManager;
+    LuminoToken internal token;
 
     // State variables
     string private escrowName;
@@ -23,7 +24,7 @@ abstract contract AEscrow is IEscrow {
     /**
      * @notice Initializes the escrow contract
      */
-    constructor(address _accessManager, address _token) {
+    function __AEscrow_init(address _accessManager, address _token) internal onlyInitializing {
         accessManager = IAccessManager(_accessManager);
         token = LuminoToken(_token);
         escrowName = getEscrowName();

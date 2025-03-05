@@ -4,13 +4,18 @@ pragma solidity ^0.8.17;
 import {AEscrow} from "./abstracts/AEscrow.sol";
 import {IEscrow} from "./interfaces/IEscrow.sol";
 import {INodeEscrow} from "./interfaces/INodeEscrow.sol";
+import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import {LShared} from "./libraries/LShared.sol";
 
-contract NodeEscrow is AEscrow, INodeEscrow {
-    constructor(address _accessManager, address _token) AEscrow(_accessManager, _token) {}
-
+contract NodeEscrow is Initializable, AEscrow, INodeEscrow {
     // State variables
     mapping(address => bool) private slashedCPs;
+    /**
+     * @notice Initializes the NodeEscrow contract
+     */
+    function initialize(address _accessManager, address _token) external initializer {
+        __AEscrow_init(_accessManager, _token);
+    }
 
     function deposit_validation() internal view override {
         if (slashedCPs[msg.sender]) {
