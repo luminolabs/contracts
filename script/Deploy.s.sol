@@ -26,22 +26,23 @@ contract DeploymentScript is Script {
     LuminoToken public tokenImpl;
     AccessManager public accessManagerImpl;
     WhitelistManager public whitelistManagerImpl;
-    EpochManager public epochManagerImpl;
     NodeEscrow public nodeEscrowImpl;
     NodeManager public nodeManagerImpl;
     JobEscrow public jobEscrowImpl;
     JobManager public jobManagerImpl;
     LeaderManager public leaderManagerImpl;
     IncentiveManager public incentiveManagerImpl;
+    
+    // Non-upgradeable contracts
+    EpochManager public epochManager;
 
     // Proxy admin
     ProxyAdmin public proxyAdmin;
 
-    // Proxies (the actual contract addresses users will interact with)
+    // Proxies
     address public tokenProxy;
     address public accessManagerProxy;
     address public whitelistManagerProxy;
-    address public epochManagerProxy;
     address public nodeEscrowProxy;
     address public nodeManagerProxy;
     address public jobEscrowProxy;
@@ -64,12 +65,14 @@ contract DeploymentScript is Script {
         tokenImpl = new LuminoToken();
         accessManagerImpl = new AccessManager();
         whitelistManagerImpl = new WhitelistManager();
-        epochManagerImpl = new EpochManager();
         nodeEscrowImpl = new NodeEscrow();
         jobEscrowImpl = new JobEscrow();
         nodeManagerImpl = new NodeManager();
         leaderManagerImpl = new LeaderManager();
         incentiveManagerImpl = new IncentiveManager();
+        
+        // Deploy EpochManager directly (non-upgradeable)
+        epochManager = new EpochManager();
 
         // 2. Deploy and initialize proxies
 
@@ -95,14 +98,6 @@ contract DeploymentScript is Script {
             abi.encodeWithSelector(
                 WhitelistManager.initialize.selector,
                 accessManagerProxy
-            )
-        );
-
-        // EpochManager proxy
-        epochManagerProxy = deployProxy(
-            address(epochManagerImpl),
-            abi.encodeWithSelector(
-                EpochManager.initialize.selector
             )
         );
 
@@ -142,7 +137,7 @@ contract DeploymentScript is Script {
             address(leaderManagerImpl),
             abi.encodeWithSelector(
                 LeaderManager.initialize.selector,
-                epochManagerProxy,
+                address(epochManager),  // Use direct address for epochManager
                 nodeManagerProxy,
                 nodeEscrowProxy,
                 accessManagerProxy,
@@ -157,7 +152,7 @@ contract DeploymentScript is Script {
                 JobManager.initialize.selector,
                 nodeManagerProxy,
                 leaderManagerProxy,
-                epochManagerProxy,
+                address(epochManager),  // Use direct address for epochManager
                 jobEscrowProxy,
                 accessManagerProxy
             )
@@ -168,7 +163,7 @@ contract DeploymentScript is Script {
             address(incentiveManagerImpl),
             abi.encodeWithSelector(
                 IncentiveManager.initialize.selector,
-                epochManagerProxy,
+                address(epochManager),  // Use direct address for epochManager
                 leaderManagerProxy,
                 jobManagerProxy,
                 nodeManagerProxy,
@@ -198,8 +193,7 @@ contract DeploymentScript is Script {
         console.log("AccessManager (Proxy):", accessManagerProxy);
         console.log("WhitelistManager (Implementation):", address(whitelistManagerImpl));
         console.log("WhitelistManager (Proxy):", whitelistManagerProxy);
-        console.log("EpochManager (Implementation):", address(epochManagerImpl));
-        console.log("EpochManager (Proxy):", epochManagerProxy);
+        console.log("EpochManager:", address(epochManager));  // No proxy
         console.log("NodeEscrow (Implementation):", address(nodeEscrowImpl));
         console.log("NodeEscrow (Proxy):", nodeEscrowProxy);
         console.log("JobEscrow (Implementation):", address(jobEscrowImpl));
