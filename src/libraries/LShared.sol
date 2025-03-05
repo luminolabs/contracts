@@ -19,7 +19,7 @@ library LShared {
     // IncentiveManager Constants
     uint256 public constant LEADER_REWARD = 5 * 1e18;
     uint256 public constant JOB_AVAILABILITY_REWARD = 1 * 1e18;
-    uint256 public constant DISPUTER_REWARD = 5 * 1e17;                     // 0.5 tokens
+    uint256 public constant DISPUTER_REWARD = 0.5 * 1e18;
     uint256 public constant LEADER_NOT_EXECUTED_PENALTY = 15 * 1e18;
     uint256 public constant JOB_NOT_CONFIRMED_PENALTY = 10 * 1e18;
     uint256 public constant MAX_PENALTIES_BEFORE_SLASH = 10;
