@@ -4,13 +4,17 @@ pragma solidity ^0.8.17;
 import {IAccessControl} from "../lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import {IAccessManager} from "./interfaces/IAccessManager.sol";
 import {LShared} from "./libraries/LShared.sol";
+import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 
-contract AccessManager is IAccessManager {
+contract AccessManager is Initializable, IAccessManager {
     // State variables
     mapping(bytes32 => RoleData) private roles;
     mapping(address => mapping(bytes32 => bool)) private userRoles;
 
-    constructor() {
+    /**
+     * @notice Initializes the AccessManager contract
+     */
+    function initialize() external initializer {
         _grantRole(LShared.ADMIN_ROLE, msg.sender);
     }
 

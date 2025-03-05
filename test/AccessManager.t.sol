@@ -21,6 +21,7 @@ contract AccessManagerTest is Test {
     function setUp() public {
         vm.startPrank(admin);
         accessManager = new AccessManager();
+        accessManager.initialize();
         vm.stopPrank();
     }
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import {IEpochManager} from "./interfaces/IEpochManager.sol";
 import {IIncentiveManager} from "./interfaces/IIncentiveManager.sol";
 import {IJobManager} from "./interfaces/IJobManager.sol";
@@ -9,13 +10,13 @@ import {INodeEscrow} from "./interfaces/INodeEscrow.sol";
 import {INodeManager} from "./interfaces/INodeManager.sol";
 import {LShared} from "./libraries/LShared.sol";
 
-contract IncentiveManager is IIncentiveManager {
+contract IncentiveManager is Initializable, IIncentiveManager {
     // Contracts
-    IEpochManager internal immutable epochManager;
-    ILeaderManager internal immutable leaderManager;
-    IJobManager internal immutable jobManager;
-    INodeManager internal immutable nodeManager;
-    INodeEscrow internal immutable nodeEscrow;
+    IEpochManager internal epochManager;
+    ILeaderManager internal leaderManager;
+    IJobManager internal jobManager;
+    INodeManager internal nodeManager;
+    INodeEscrow internal nodeEscrow;
 
     // State variables
     mapping(address => uint256) public penaltyCount;
@@ -24,13 +25,16 @@ contract IncentiveManager is IIncentiveManager {
     mapping(uint256 => bool) private leaderRewardClaimed;
     mapping(uint256 => bool) private disputerRewardClaimed;
 
-    constructor(
+    /**
+     * @notice Initializes the IncentiveManager contract
+     */
+    function initialize(
         address _epochManager,
         address _leaderManager,
         address _jobManager,
         address _nodeManager,
         address _stakeEscrow
-    ) {
+    ) external initializer {
         epochManager = IEpochManager(_epochManager);
         leaderManager = ILeaderManager(_leaderManager);
         jobManager = IJobManager(_jobManager);

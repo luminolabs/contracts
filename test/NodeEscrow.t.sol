@@ -39,8 +39,11 @@ contract NodeEscrowTest is Test {
         
         // Deploy contracts
         token = new LuminoToken();
+        token.initialize();
         accessManager = new AccessManager();
-        nodeEscrow = new NodeEscrow(address(accessManager), address(token));
+        accessManager.initialize();
+        nodeEscrow = new NodeEscrow();
+        nodeEscrow.initialize(address(accessManager), address(token));
 
         // Setup roles
         accessManager.grantRole(LShared.OPERATOR_ROLE, operator);

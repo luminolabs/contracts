@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import {IAccessManager} from "./interfaces/IAccessManager.sol";
 import {IEpochManager} from "./interfaces/IEpochManager.sol";
 import {IJobEscrow} from "./interfaces/IJobEscrow.sol";
@@ -9,13 +10,13 @@ import {ILeaderManager} from "./interfaces/ILeaderManager.sol";
 import {INodeManager} from "./interfaces/INodeManager.sol";
 import {LShared} from "./libraries/LShared.sol";
 
-contract JobManager is IJobManager {
+contract JobManager is Initializable, IJobManager {
     // Contracts
-    INodeManager private immutable nodeManager;
-    ILeaderManager private immutable leaderManager;
-    IEpochManager private immutable epochManager;
-    IJobEscrow private immutable jobEscrow;
-    IAccessManager private immutable accessManager;
+    INodeManager private nodeManager;
+    ILeaderManager private leaderManager;
+    IEpochManager private epochManager;
+    IJobEscrow private jobEscrow;
+    IAccessManager private accessManager;
 
     // State variables
     uint256 private jobCounter;
@@ -32,13 +33,13 @@ contract JobManager is IJobManager {
     // Constants
     uint256 private constant MAX_JOBS_PER_NODE = 1;
 
-    constructor(
+    function initialize(
         address _nodeManager,
         address _leaderManager,
         address _epochManager,
         address _jobEscrow,
         address _accessManager
-    ) {
+    ) external initializer {
         nodeManager = INodeManager(_nodeManager);
         leaderManager = ILeaderManager(_leaderManager);
         epochManager = IEpochManager(_epochManager);

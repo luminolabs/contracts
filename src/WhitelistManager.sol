@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import {IAccessManager} from "./interfaces/IAccessManager.sol";
 import {IWhitelistManager} from "./interfaces/IWhitelistManager.sol";
 import {LShared} from "./libraries/LShared.sol";
 
-contract WhitelistManager is IWhitelistManager {
+contract WhitelistManager is Initializable, IWhitelistManager {
     // Contracts
-    IAccessManager private immutable accessManager;
+    IAccessManager private accessManager;
 
     // State variables
     mapping(address => CPInfo) private cpInfo;
@@ -19,7 +20,10 @@ contract WhitelistManager is IWhitelistManager {
     error CooldownActive(address cp, uint256 remainingTime);
     error NotWhitelisted(address cp);
 
-    constructor(address _accessManager) {
+    /**
+     * @notice Initializes the WhitelistManager contract
+     */
+    function initialize(address _accessManager) external initializer {
         accessManager = IAccessManager(_accessManager);
     }
 

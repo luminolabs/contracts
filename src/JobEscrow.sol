@@ -3,11 +3,17 @@ pragma solidity ^0.8.17;
 
 import {AEscrow} from "./abstracts/AEscrow.sol";
 import {IJobEscrow} from "./interfaces/IJobEscrow.sol";
+import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import {LShared} from "./libraries/LShared.sol";
 
-contract JobEscrow is AEscrow, IJobEscrow {
-    constructor (address _accessManager, address _token) AEscrow(_accessManager, _token) {}
-
+contract JobEscrow is Initializable, AEscrow, IJobEscrow {
+    
+    /**
+     * @notice Initializes the NodeEscrow contract
+     */
+    function initialize(address _accessManager, address _token) external initializer {
+        __AEscrow_init(_accessManager, _token);
+    }
     /**
       * @notice Release payment to a worker
       */

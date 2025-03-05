@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import {IAccessManager} from "./interfaces/IAccessManager.sol";
 import {INodeManager} from "./interfaces/INodeManager.sol";
 import {INodeEscrow} from "./interfaces/INodeEscrow.sol";
 import {IWhitelistManager} from "./interfaces/IWhitelistManager.sol";
 import {LShared} from "./libraries/LShared.sol";
 
-contract NodeManager is INodeManager {
+contract NodeManager is Initializable, INodeManager {
     // Contracts
-    INodeEscrow public immutable nodeEscrow;
-    IAccessManager private immutable accessManager;
-    IWhitelistManager private immutable whitelistManager;
+    INodeEscrow public nodeEscrow;
+    IAccessManager private accessManager;
+    IWhitelistManager private whitelistManager;
 
     // State variables
     uint256 private nodeCounter;
@@ -20,11 +21,14 @@ contract NodeManager is INodeManager {
     mapping(uint256 => uint256[]) private poolNodes;
     mapping(address => uint256) private cpStakeRequirements;
 
-    constructor(
+    /**
+     * @notice Initializes the NodeManager contract
+     */
+    function initialize(
         address _nodeEscrow,
         address _whitelistManager,
         address _accessManager
-    ) {
+    ) external initializer {
         nodeEscrow = INodeEscrow(_nodeEscrow);
         whitelistManager = IWhitelistManager(_whitelistManager);
         accessManager = IAccessManager(_accessManager);

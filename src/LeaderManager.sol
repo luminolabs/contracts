@@ -7,14 +7,15 @@ import {ILeaderManager} from "./interfaces/ILeaderManager.sol";
 import {INodeManager} from "./interfaces/INodeManager.sol";
 import {INodeEscrow} from "./interfaces/INodeEscrow.sol";
 import {IWhitelistManager} from "./interfaces/IWhitelistManager.sol";
+import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 
-contract LeaderManager is ILeaderManager {
+contract LeaderManager is Initializable, ILeaderManager {
     // Contracts
-    IEpochManager public immutable epochManager;
-    INodeManager public immutable nodeManager;
-    INodeEscrow public immutable nodeEscrow;
-    IAccessManager public immutable accessManager;
-    IWhitelistManager public immutable whitelistManager;
+    IEpochManager public epochManager;
+    INodeManager public nodeManager;
+    INodeEscrow public nodeEscrow;
+    IAccessManager public accessManager;
+    IWhitelistManager public whitelistManager;
 
     // State variables
     mapping(uint256 => mapping(uint256 => bytes32)) private nodeCommitments;
@@ -23,13 +24,16 @@ contract LeaderManager is ILeaderManager {
     mapping(uint256 => bytes32) private finalRandomValues;
     mapping(uint256 => uint256) private epochLeaders;
 
-    constructor(
+    /**
+     * @notice Initializes the LeaderManager contract
+     */
+    function initialize(
         address _epochManager,
         address _nodeManager,
         address _nodeEscrow,
         address _accessManager,
         address _whitelistManager
-    ) {
+    ) external initializer {
         epochManager = IEpochManager(_epochManager);
         nodeManager = INodeManager(_nodeManager);
         nodeEscrow = INodeEscrow(_nodeEscrow);
