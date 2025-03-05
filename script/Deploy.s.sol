@@ -67,10 +67,11 @@ contract DeploymentScript is Script {
         whitelistManagerImpl = new WhitelistManager();
         nodeEscrowImpl = new NodeEscrow();
         jobEscrowImpl = new JobEscrow();
+        jobManagerImpl = new JobManager();
         nodeManagerImpl = new NodeManager();
         leaderManagerImpl = new LeaderManager();
         incentiveManagerImpl = new IncentiveManager();
-        
+
         // Deploy EpochManager directly (non-upgradeable)
         epochManager = new EpochManager();
 
@@ -209,7 +210,10 @@ contract DeploymentScript is Script {
     }
 
     // Helper function to deploy a proxy
-    function deployProxy(address implementation, bytes memory data) internal returns (address) {
+    function deployProxy(address implementation, bytes memory data, string memory name) internal returns (address) {
+        require(implementation != address(0), "Implementation address is zero");
+        console.log("Creating proxy of", name, ", with implementation:", implementation);
+
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             implementation,
             address(proxyAdmin),
