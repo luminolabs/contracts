@@ -210,9 +210,8 @@ contract DeploymentScript is Script {
     }
 
     // Helper function to deploy a proxy
-    function deployProxy(address implementation, bytes memory data, string memory name) internal returns (address) {
+    function deployProxy(address implementation, bytes memory data) internal returns (address) {
         require(implementation != address(0), "Implementation address is zero");
-        console.log("Creating proxy of", name, ", with implementation:", implementation);
 
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             implementation,
