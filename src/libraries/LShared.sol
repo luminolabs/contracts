@@ -8,12 +8,12 @@ library LShared {
     bytes32 public constant CONTRACTS_ROLE = keccak256("CONTRACTS_ROLE");
 
     // EpochManager Constants
-    uint256 public constant COMMIT_DURATION = 5 seconds;
-    uint256 public constant REVEAL_DURATION = 5 seconds;
-    uint256 public constant ELECT_DURATION = 5 seconds;
-    uint256 public constant EXECUTE_DURATION = 5 seconds;
-    uint256 public constant CONFIRM_DURATION = 15 seconds;
-    uint256 public constant DISPUTE_DURATION = 5 seconds;
+    uint256 public constant COMMIT_DURATION = 15 seconds;
+    uint256 public constant REVEAL_DURATION = 15 seconds;
+    uint256 public constant ELECT_DURATION = 15 seconds;
+    uint256 public constant EXECUTE_DURATION = 15 seconds;
+    uint256 public constant CONFIRM_DURATION = 45 seconds;
+    uint256 public constant DISPUTE_DURATION = 15 seconds;
     uint256 public constant EPOCH_DURATION = COMMIT_DURATION + REVEAL_DURATION + ELECT_DURATION + EXECUTE_DURATION + CONFIRM_DURATION + DISPUTE_DURATION;
 
     // IncentiveManager Constants

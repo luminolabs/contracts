@@ -9,8 +9,8 @@ import {IEscrow} from "../interfaces/IEscrow.sol";
 abstract contract AEscrow is Initializable, IEscrow {
     // Constants
     uint256 public constant LOCK_PERIOD = 1 days;
-    uint256 public constant MIN_DEPOSIT = 0.1 ether;
-    uint256 public constant MIN_BALANCE = 0.01 ether;
+    uint256 public constant MIN_DEPOSIT = 20 ether;
+    uint256 public constant MIN_BALANCE = 20 ether;
 
     // Contracts
     IAccessManager internal accessManager;
