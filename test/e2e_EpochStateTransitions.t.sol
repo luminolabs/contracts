@@ -40,7 +40,7 @@ contract EpochStateTransitionsE2ETest is Test {
     uint256 public constant INITIAL_BALANCE = 10000 ether;
     uint256 public constant COMPUTE_RATING = 10;
     uint256 public constant STAKE_AMOUNT = 1000 ether;
-    uint256 public constant JOB_DEPOSIT = 10 ether;
+    uint256 public constant JOB_DEPOSIT = 20 ether;
     string public constant MODEL_NAME = "llm_llama3_1_8b";
 
     function setUp() public {

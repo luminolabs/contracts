@@ -20,7 +20,7 @@ contract NodeEscrowTest is Test {
     address public contractRole = address(5);
 
     // Constants
-    uint256 public constant MIN_DEPOSIT = 0.1 ether;
+    uint256 public constant MIN_DEPOSIT = 20 ether;
     uint256 public constant INITIAL_BALANCE = 1000 ether;
     uint256 public constant PENALTY_AMOUNT = 50 ether;
     uint256 public constant REWARD_AMOUNT = 25 ether;
@@ -61,7 +61,7 @@ contract NodeEscrowTest is Test {
     function testDeposit() public {
         vm.startPrank(cp1);
         
-        uint256 depositAmount = 1 ether;
+        uint256 depositAmount = MIN_DEPOSIT;
         token.approve(address(nodeEscrow), depositAmount);
 
         // Test event emission
@@ -93,7 +93,7 @@ contract NodeEscrowTest is Test {
     function testWithdrawRequest() public {
         // First make a deposit
         vm.startPrank(cp1);
-        uint256 depositAmount = 1 ether;
+        uint256 depositAmount = MIN_DEPOSIT;
         token.approve(address(nodeEscrow), depositAmount);
         nodeEscrow.deposit(depositAmount);
         
