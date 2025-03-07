@@ -25,7 +25,7 @@ library LShared {
     uint256 public constant MAX_PENALTIES_BEFORE_SLASH = 10;
 
     // JobManager Constants
-    uint256 public constant MIN_BALANCE_TO_SUBMIT = 1 * 1e18;
+    uint256 public constant MIN_BALANCE_TO_SUBMIT = 20 * 1e18;
 
     // WhitelistManager Constants
     uint256 public constant WHITELIST_COOLDOWN = 3 days;
