@@ -3,7 +3,9 @@ pragma solidity ^0.8.17;
 
 interface IEpochManager {
     // Enums
-    enum State {COMMIT, REVEAL, ELECT, EXECUTE, CONFIRM, DISPUTE, PAUSED}// Errors
+    enum State {COMMIT, REVEAL, ELECT, EXECUTE, CONFIRM, DISPUTE, PAUSED}
+
+    // Errors
     error InvalidState(State state);
 
     // Epoch management functions
