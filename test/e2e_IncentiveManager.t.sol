@@ -41,10 +41,10 @@ contract IncentiveManagerE2ETest is Test {
 
     // Constants
     uint256 public constant INITIAL_BALANCE = 20000 ether;
-    uint256 public constant COMPUTE_RATING = 10;
-    uint256 public constant STAKE_AMOUNT = 1000 ether;
+    uint256 public constant COMPUTE_RATING = 500;
+    uint256 public constant STAKE_AMOUNT = 5000 ether;
     uint256 public constant JOB_DEPOSIT = 20 ether;
-    string public constant MODEL_NAME = "llm_llama3_1_8b";
+    string public constant MODEL_NAME = "llm_llama3_2_1b";
 
     // Events to track
     event LeaderRewardApplied(uint256 indexed epoch, address cp, uint256 amount);
@@ -133,7 +133,7 @@ contract IncentiveManagerE2ETest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME, "FULL");
         vm.stopPrank();
         
         // Move to execute phase
@@ -271,7 +271,7 @@ contract IncentiveManagerE2ETest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        jobManager.submitJob("test job", MODEL_NAME, COMPUTE_RATING);
+        jobManager.submitJob("test job", MODEL_NAME, "FULL");
         vm.stopPrank();
         
         // Move to execute phase
@@ -390,7 +390,7 @@ contract IncentiveManagerE2ETest is Test {
             vm.startPrank(jobSubmitter);
             token.approve(address(jobEscrow), JOB_DEPOSIT);
             jobEscrow.deposit(JOB_DEPOSIT);
-            jobManager.submitJob(string(abi.encodePacked("job", vm.toString(i))), MODEL_NAME, COMPUTE_RATING);
+            jobManager.submitJob(string(abi.encodePacked("job", vm.toString(i))), MODEL_NAME, "FULL");
             vm.stopPrank();
             
             // Move to EXECUTE phase
@@ -478,7 +478,7 @@ contract IncentiveManagerE2ETest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT * 3);
         jobEscrow.deposit(JOB_DEPOSIT * 3);
-        jobManager.submitJob("job1", MODEL_NAME, COMPUTE_RATING);
+        jobManager.submitJob("job1", MODEL_NAME, "FULL");
         vm.stopPrank();
         
         uint256 currentEpoch = epochManager.getCurrentEpoch();
@@ -534,7 +534,7 @@ contract IncentiveManagerE2ETest is Test {
         
         // Submit another job for the new epoch
         vm.startPrank(jobSubmitter);
-        jobManager.submitJob("job2", MODEL_NAME, COMPUTE_RATING);
+        jobManager.submitJob("job2", MODEL_NAME, "FULL");
         vm.stopPrank();
         
         // Move to EXECUTE phase

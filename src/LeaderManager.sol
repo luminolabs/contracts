@@ -124,6 +124,13 @@ contract LeaderManager is Initializable, ILeaderManager {
     }
 
     /**
+     * @notice Gets the leader for the given epoch
+     */
+    function getLeaderForEpoch(uint256 epoch) external view returns (uint256) {
+        return epochLeaders[epoch];
+    }
+
+    /**
      * @notice Validates if a caller is the leader for the active epoch
      */
     function validateLeader(address caller) external view {

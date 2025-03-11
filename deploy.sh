@@ -12,7 +12,7 @@ cd "$CONTRACTS_DIR"
 
 # Run the deployment script and capture the output
 FORGE_OUT=$(mktemp)
-forge script script/Deploy.s.sol:DeploymentScript --rpc-url $(grep "RPC_URL" .env | cut -d'=' -f2) --private-key $(grep "DEPLOYER_PRIVATE_KEY" .env | cut -d'=' -f2) --broadcast | tee "$FORGE_OUT"
+forge script script/Deploy.s.sol:DeploymentScript --rpc-url $RPC_URL --private-key $DEPLOYER_PRIVATE_KEY --broadcast | tee "$FORGE_OUT"
 
 # Step 2: Extract contract addresses from deployment output
 echo "Extracting contract addresses..."

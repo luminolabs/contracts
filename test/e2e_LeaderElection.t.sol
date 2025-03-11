@@ -34,8 +34,8 @@ contract LeaderElectionE2ETest is Test {
 
     // Constants
     uint256 public constant INITIAL_BALANCE = 10000 ether;
-    uint256 public constant COMPUTE_RATING = 10;
-    uint256 public constant STAKE_AMOUNT = 1000 ether;
+    uint256 public constant COMPUTE_RATING = 500;
+    uint256 public constant STAKE_AMOUNT = 5000 ether;
 
     // Events to track
     event CommitSubmitted(

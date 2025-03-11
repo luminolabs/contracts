@@ -23,6 +23,7 @@ interface ILeaderManager {
     function revealSecret(uint256 nodeId, bytes calldata secret) external;
     function electLeader() external returns (uint256 leaderNodeId);
     function getCurrentLeader() external view returns (uint256);
+    function getLeaderForEpoch(uint256 epoch) external view returns (uint256);
     function validateLeader(address caller) external view;
     function getFinalRandomValue(uint256 epoch) external view returns (bytes32);
     function getNodesWhoRevealed(uint256 epoch) external view returns (uint256[] memory);

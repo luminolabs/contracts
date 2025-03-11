@@ -49,18 +49,20 @@ contract IncentiveManager is Initializable, IIncentiveManager {
         uint256 epoch = epochManager.getCurrentEpoch();
 
         // Validate that epoch hasn't been processed yet
-        validate(epoch);
-        // Dispute first so that disputer can be rewarded
-        disputeAll(epoch);
-        // Then reward all
-        rewardAll(epoch);
+        bool canContinue = validate(epoch);
+        if (canContinue) {
+            // Dispute first so that disputer can be rewarded
+            disputeAll(epoch);
+            // Then reward all
+            rewardAll(epoch);
+        }
     }
 
     // Internal functions
 
     function rewardAll(uint256 epoch) internal {
         // Reward leader for assignments
-        address leader = nodeManager.getNodeOwner(leaderManager.getCurrentLeader());
+        address leader = nodeManager.getNodeOwner(leaderManager.getLeaderForEpoch(epoch));
         if (!leaderRewardClaimed[epoch] && jobManager.wasAssignmentRoundStarted(epoch)) {
             nodeEscrow.applyReward(
                 leader,
@@ -100,7 +102,7 @@ contract IncentiveManager is Initializable, IIncentiveManager {
 
     function disputeAll(uint256 epoch) internal {
         // Penalize leader for missing assignments
-        address leader = nodeManager.getNodeOwner(leaderManager.getCurrentLeader());
+        address leader = nodeManager.getNodeOwner(leaderManager.getLeaderForEpoch(epoch));
         if (!jobManager.wasAssignmentRoundStarted(epoch)) {
             nodeEscrow.applyPenalty(
                 leader,
@@ -129,11 +131,12 @@ contract IncentiveManager is Initializable, IIncentiveManager {
         }
     }
 
-    function validate(uint256 epoch) internal {
+    function validate(uint256 epoch) internal returns (bool) {
         if (processedEpochs[epoch]) {
-            revert EpochAlreadyProcessed(epoch);
+            return false;
         }
         processedEpochs[epoch] = true;
+        return true;
     }
 
     function slashCP(address cp, string memory reason) internal {

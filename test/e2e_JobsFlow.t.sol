@@ -38,11 +38,11 @@ contract JobLifecycleE2ETest is Test {
 
     // Constants
     uint256 public constant INITIAL_BALANCE = 10000 ether;
-    uint256 public constant COMPUTE_RATING = 10;
-    uint256 public constant STAKE_AMOUNT = 1000 ether;
+    uint256 public constant COMPUTE_RATING = 500;
+    uint256 public constant STAKE_AMOUNT = 5000 ether;
     uint256 public constant JOB_DEPOSIT = 20 ether;
-    string public constant MODEL_NAME_1 = "llm_llama3_1_8b";
-    string public constant MODEL_NAME_2 = "llm_llama3_2_1b";
+    string public constant MODEL_NAME_1 = "llm_llama3_2_1b";
+    string public constant MODEL_NAME_2 = "llm_llama3_2_3b";
 
     // Events to test
     event JobSubmitted(uint256 indexed jobId, address indexed submitter, uint256 requiredPool);
@@ -123,7 +123,7 @@ contract JobLifecycleE2ETest is Test {
         uint256 jobId = jobManager.submitJob(
             "test job args",
             MODEL_NAME_1,
-            COMPUTE_RATING
+            "FULL"
         );
 
          // Track initial balances
@@ -197,7 +197,7 @@ contract JobLifecycleE2ETest is Test {
             jobIds[i] = jobManager.submitJob(
                 string(abi.encodePacked("test job ", vm.toString(i + 1))),
                 i % 2 == 0 ? MODEL_NAME_1 : MODEL_NAME_2,
-                COMPUTE_RATING
+                "FULL"
             );
         }
         vm.stopPrank();
@@ -234,7 +234,7 @@ contract JobLifecycleE2ETest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, "FULL");
         vm.stopPrank();
         
         // 2. Try to confirm job before assignment
@@ -288,7 +288,7 @@ contract JobLifecycleE2ETest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, "FULL");
         vm.stopPrank();
         
         // Setup leader election for this epoch - make cp1 reveal its secret
@@ -383,9 +383,9 @@ contract JobLifecycleE2ETest is Test {
         token.approve(address(jobEscrow), JOB_DEPOSIT * 3);
         jobEscrow.deposit(JOB_DEPOSIT * 3);
         
-        uint256 jobId1 = jobManager.submitJob("job 1", MODEL_NAME_1, COMPUTE_RATING);
-        uint256 jobId2 = jobManager.submitJob("job 2", MODEL_NAME_1, COMPUTE_RATING);
-        uint256 jobId3 = jobManager.submitJob("job 3", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId1 = jobManager.submitJob("job 1", MODEL_NAME_1, "FULL");
+        uint256 jobId2 = jobManager.submitJob("job 2", MODEL_NAME_1, "FULL");
+        uint256 jobId3 = jobManager.submitJob("job 3", MODEL_NAME_1, "FULL");
         vm.stopPrank();
         
         // 2. Assign jobs

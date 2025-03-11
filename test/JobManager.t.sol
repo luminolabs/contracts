@@ -34,12 +34,12 @@ contract JobManagerTest is Test {
     address public jobSubmitter = address(5);
 
     // Constants
-    uint256 public constant INITIAL_BALANCE = 1000 ether;
-    uint256 public constant COMPUTE_RATING = 10;
-    uint256 public constant STAKE_AMOUNT = 100 ether;
+    uint256 public constant INITIAL_BALANCE = 10000 ether;
+    uint256 public constant COMPUTE_RATING = 500;
+    uint256 public constant STAKE_AMOUNT = 5000 ether;
     uint256 public constant JOB_DEPOSIT = 20 ether;
-    string public constant MODEL_NAME_1 = "llm_llama3_1_8b";
-    string public constant MODEL_NAME_2 = "llm_llama3_2_1b";
+    string public constant MODEL_NAME_1 = "llm_llama3_2_1b";
+    string public constant MODEL_NAME_2 = "llm_llama3_2_3b";
 
     // Events to test
     event JobSubmitted(uint256 indexed jobId, address indexed submitter, uint256 requiredPool);
@@ -141,7 +141,7 @@ contract JobManagerTest is Test {
         uint256 jobId = jobManager.submitJob(
             "test job args",
             MODEL_NAME_1,
-            COMPUTE_RATING
+            "FULL"
         );
 
         assertGt(jobId, 0, "Job ID should be greater than 0");
@@ -154,7 +154,7 @@ contract JobManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, "FULL");
         vm.stopPrank();
 
         IJobManager.JobStatus status = jobManager.getJobStatus(jobId);
@@ -165,7 +165,7 @@ contract JobManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job args", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job args", MODEL_NAME_1, "FULL");
         vm.stopPrank();
 
         IJobManager.Job memory job = jobManager.getJobDetails(jobId);
@@ -175,7 +175,7 @@ contract JobManagerTest is Test {
         assertEq(uint256(job.status), uint256(IJobManager.JobStatus.NEW));
         assertEq(job.requiredPool, COMPUTE_RATING);
         assertEq(job.args, "test job args");
-        assertEq(job.base_model_name, MODEL_NAME_1);
+        assertEq(job.baseModelName, MODEL_NAME_1);
         assertEq(job.tokenCount, 0);
         assertEq(job.createdAt, block.timestamp);
     }
@@ -184,7 +184,7 @@ contract JobManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job args", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job args", MODEL_NAME_1, "FULL");
         vm.stopPrank();
 
         _setupAssignment();
@@ -199,7 +199,7 @@ contract JobManagerTest is Test {
         assertEq(uint256(jobs[0].status), uint256(IJobManager.JobStatus.ASSIGNED), "Status should be ASSIGNED");
         assertEq(jobs[0].requiredPool, COMPUTE_RATING, "Required pool should match");
         assertEq(jobs[0].args, "test job args", "Args should match");
-        assertEq(jobs[0].base_model_name, MODEL_NAME_1, "Model name should match");
+        assertEq(jobs[0].baseModelName, MODEL_NAME_1, "Model name should match");
         assertEq(jobs[0].tokenCount, 0, "Token count should be 0");
         assertGt(jobs[0].createdAt, 0, "Created at should be set");
     }
@@ -209,8 +209,8 @@ contract JobManagerTest is Test {
         token.approve(address(jobEscrow), JOB_DEPOSIT * 2);
         jobEscrow.deposit(JOB_DEPOSIT * 2);
 
-        uint256 jobId1 = jobManager.submitJob("job 1", MODEL_NAME_1, COMPUTE_RATING);
-        uint256 jobId2 = jobManager.submitJob("job 2", MODEL_NAME_2, COMPUTE_RATING);
+        uint256 jobId1 = jobManager.submitJob("job 1", MODEL_NAME_1, "FULL");
+        uint256 jobId2 = jobManager.submitJob("job 2", MODEL_NAME_2, "FULL");
         vm.stopPrank();
 
         uint256[] memory jobs = jobManager.getJobsBySubmitter(jobSubmitter);
@@ -227,7 +227,7 @@ contract JobManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, "FULL");
         vm.stopPrank();
 
         // Setup leader election
@@ -269,7 +269,7 @@ contract JobManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, "FULL");
         vm.stopPrank();
 
         _setupAssignment();
@@ -305,7 +305,7 @@ contract JobManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, "FULL");
         vm.stopPrank();
 
         _setupAssignment();
@@ -325,7 +325,7 @@ contract JobManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, "FULL");
         vm.stopPrank();
 
         _setupAssignment();
@@ -346,7 +346,7 @@ contract JobManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, "FULL");
         vm.stopPrank();
 
         _setupAssignment();
@@ -384,7 +384,7 @@ contract JobManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, "FULL");
         vm.stopPrank();
 
         _setupAssignment();
@@ -412,7 +412,7 @@ contract JobManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, "FULL");
         vm.stopPrank();
 
         _setupAssignment();
@@ -442,7 +442,7 @@ contract JobManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, "FULL");
         vm.stopPrank();
 
         _setupAssignment();
@@ -476,7 +476,7 @@ contract JobManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, "FULL");
         vm.stopPrank();
 
         _setupAssignment();
@@ -504,7 +504,7 @@ contract JobManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", MODEL_NAME_1, "FULL");
         vm.stopPrank();
 
         _setupAssignment();
@@ -519,7 +519,7 @@ contract JobManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT * 2);
         jobEscrow.deposit(JOB_DEPOSIT * 2);
-        uint256 jobId1 = jobManager.submitJob("job 1", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId1 = jobManager.submitJob("job 1", MODEL_NAME_1, "FULL");
         vm.stopPrank();
 
         // Assign first job
@@ -542,7 +542,7 @@ contract JobManagerTest is Test {
         
         // Submit second job
         vm.startPrank(jobSubmitter);
-        uint256 jobId2 = jobManager.submitJob("job 2", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId2 = jobManager.submitJob("job 2", MODEL_NAME_1, "FULL");
         vm.stopPrank();
         
         // Verify job 2 is not assigned yet
@@ -562,7 +562,7 @@ contract JobManagerTest is Test {
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
         
-        uint256 jobId = jobManager.submitJob("test job", "invalid_model", COMPUTE_RATING);
+        uint256 jobId = jobManager.submitJob("test job", "invalid_model", "FULL");
         vm.stopPrank();
         
         // Assign job
@@ -662,7 +662,7 @@ contract JobManagerTest is Test {
         token.approve(address(jobEscrow), JOB_DEPOSIT * 3);
         jobEscrow.deposit(JOB_DEPOSIT * 3);
         
-        uint256 jobId1 = jobManager.submitJob("test job 1", MODEL_NAME_1, COMPUTE_RATING);
+        uint256 jobId1 = jobManager.submitJob("test job 1", MODEL_NAME_1, "FULL");
         vm.stopPrank();
         
         // 2. Assign first job
@@ -685,7 +685,7 @@ contract JobManagerTest is Test {
         
         // Submit second job
         vm.startPrank(jobSubmitter);
-        uint256 jobId2 = jobManager.submitJob("test job 2", MODEL_NAME_2, COMPUTE_RATING);
+        uint256 jobId2 = jobManager.submitJob("test job 2", MODEL_NAME_2, "FULL");
         vm.stopPrank();
         
         // Assign second job

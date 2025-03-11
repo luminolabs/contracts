@@ -49,13 +49,38 @@ contract JobManager is Initializable, IJobManager {
 
     function submitJob(
         string calldata jobArgs,
-        string calldata base_model_name,
-        uint256 requiredPool
+        string calldata baseModelName,
+        string calldata ftType
     ) external returns (uint256) {
         jobEscrow.requireBalance(msg.sender, LShared.MIN_BALANCE_TO_SUBMIT);
 
         jobCounter++;
         uint256 jobId = jobCounter;
+        uint256 requiredPool = 0;
+
+        // Assign pool for job
+        if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_dummy"))) {
+            requiredPool = 0;
+        } else if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_2_1b"))) {
+            requiredPool = 500;
+        } else if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_2_3b"))) {
+            requiredPool = 500;
+        } else if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_1_8b"))) {
+            if (keccak256(abi.encodePacked(ftType)) == keccak256(abi.encodePacked("FULL"))) {
+                requiredPool = 1500;
+            } else {
+                requiredPool = 500;
+            }
+        } else if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_1_70b")) ||
+            keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_3_70b"))) {
+            if (keccak256(abi.encodePacked(ftType)) == keccak256(abi.encodePacked("FULL"))) {
+                requiredPool = 8400;
+            } else {
+                requiredPool = 2700;
+            }
+        } else {
+            revert InvalidModelName(baseModelName);
+        }
 
         jobs[jobId] = Job({
             id: jobId,
@@ -64,7 +89,8 @@ contract JobManager is Initializable, IJobManager {
             status: JobStatus.NEW,
             requiredPool: requiredPool,
             args: jobArgs,
-            base_model_name: base_model_name,
+            baseModelName: baseModelName,
+            ftType: ftType,
             tokenCount: 0,
             createdAt: block.timestamp
         });
@@ -320,13 +346,19 @@ contract JobManager is Initializable, IJobManager {
 
     function calculateJobPayment(Job storage job) internal view returns (uint256) {
         uint256 modelFeePerMillionTokens = 0;
-        string memory model_name = job.base_model_name;
+        string memory model_name = job.baseModelName;
 
         // Assign fee per million tokens based on model name
         if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_llama3_2_1b"))) {
             modelFeePerMillionTokens = 1 * 1e18;
-        } else if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_llama3_1_8b"))) {
+        } else if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_llama3_2_3b"))) {
             modelFeePerMillionTokens = 2 * 1e18;
+        } else if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_llama3_1_8b"))) {
+            modelFeePerMillionTokens = 4 * 1e18;
+        } else if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_llama3_1_70b"))) {
+            modelFeePerMillionTokens = 12 * 1e18;
+        } else if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_llama3_3_70b"))) {
+            modelFeePerMillionTokens = 12 * 1e18;
         } else if (keccak256(abi.encodePacked(model_name)) == keccak256(abi.encodePacked("llm_dummy"))) {
             modelFeePerMillionTokens = 1 * 1e18;
         } else {

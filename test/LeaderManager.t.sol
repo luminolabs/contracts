@@ -27,8 +27,8 @@ contract LeaderManagerTest is Test {
     address public cp2 = address(4);
 
     // Constants
-    uint256 public constant STAKE_AMOUNT = 100 ether;
-    uint256 public constant COMPUTE_RATING = 10;
+    uint256 public constant STAKE_AMOUNT = 5000 ether;
+    uint256 public constant COMPUTE_RATING = 500;
 
     // Events to test
     event CommitSubmitted(uint256 indexed epoch, uint256 indexed nodeId, address indexed owner);

@@ -35,10 +35,10 @@ contract IncentiveManagerTest is Test {
 
     // Constants
     uint256 public constant INITIAL_BALANCE = 10000 ether;
-    uint256 public constant COMPUTE_RATING = 10;
-    uint256 public constant STAKE_AMOUNT = 1000 ether; // Increased stake amount
+    uint256 public constant COMPUTE_RATING = 500;
+    uint256 public constant STAKE_AMOUNT = 5000 ether; // Increased stake amount
     uint256 public constant JOB_DEPOSIT = 20 ether;
-    string public constant MODEL_NAME = "llm_llama3_1_8b";
+    string public constant MODEL_NAME = "llm_llama3_2_1b";
 
     // Events to test
     event LeaderRewardApplied(uint256 indexed epoch, address cp, uint256 amount);
@@ -169,7 +169,7 @@ contract IncentiveManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        jobManager.submitJob("test job", MODEL_NAME, COMPUTE_RATING);
+        jobManager.submitJob("test job", MODEL_NAME, "FULL");
         vm.stopPrank();
         
         vm.prank(leader);
@@ -274,7 +274,7 @@ contract IncentiveManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        jobManager.submitJob("test job", MODEL_NAME, COMPUTE_RATING);
+        jobManager.submitJob("test job", MODEL_NAME, "FULL");
         vm.stopPrank();
         
         // Ensure leader has enough stake
@@ -316,7 +316,7 @@ contract IncentiveManagerTest is Test {
         vm.startPrank(jobSubmitter);
         token.approve(address(jobEscrow), JOB_DEPOSIT);
         jobEscrow.deposit(JOB_DEPOSIT);
-        jobManager.submitJob("test job", MODEL_NAME, COMPUTE_RATING);
+        jobManager.submitJob("test job", MODEL_NAME, "FULL");
         vm.stopPrank();
         
         // Move to execute phase

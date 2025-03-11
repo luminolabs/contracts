@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 interface IIncentiveManager {
     // Errors
-    error EpochAlreadyProcessed(uint256 epoch);
+
 
     // Events
     event LeaderRewardApplied(uint256 indexed epoch, address cp, uint256 amount);
