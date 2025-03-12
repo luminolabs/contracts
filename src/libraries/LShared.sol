@@ -30,6 +30,10 @@ library LShared {
     // WhitelistManager Constants
     uint256 public constant WHITELIST_COOLDOWN = 3 days;
 
+    // Escrow Constants
+    uint256 public constant LOCK_PERIOD = 1 days;
+    uint256 public constant MIN_DEPOSIT = 20 * 1e18;
+
     // NodeEscrow Constants
     uint256 public constant STAKE_PER_RATING = 10 * 1e18;
 }

@@ -5,13 +5,9 @@ import {LuminoToken} from "../LuminoToken.sol";
 import {Initializable} from "../../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import {IAccessManager} from "../interfaces/IAccessManager.sol";
 import {IEscrow} from "../interfaces/IEscrow.sol";
+import {LShared} from "../libraries/LShared.sol";
 
 abstract contract AEscrow is Initializable, IEscrow {
-    // Constants
-    uint256 public constant LOCK_PERIOD = 1 days;
-    uint256 public constant MIN_DEPOSIT = 20 ether;
-    uint256 public constant MIN_BALANCE = 20 ether;
-
     // Contracts
     IAccessManager internal accessManager;
     LuminoToken internal token;
@@ -36,8 +32,8 @@ abstract contract AEscrow is Initializable, IEscrow {
      * @notice Allows deposits into escrow
      */
     function deposit(uint256 amount) public virtual {
-        if (amount < MIN_DEPOSIT) {
-            revert BelowMinimumDeposit(amount, MIN_DEPOSIT);
+        if (amount < LShared.MIN_DEPOSIT) {
+            revert BelowMinimumDeposit(amount, LShared.MIN_DEPOSIT);
         }
 
         deposit_validation();
@@ -71,7 +67,7 @@ abstract contract AEscrow is Initializable, IEscrow {
             active: true
         });
 
-        emit WithdrawRequested(msg.sender, amount, block.timestamp + LOCK_PERIOD, escrowName);
+        emit WithdrawRequested(msg.sender, amount, block.timestamp + LShared.LOCK_PERIOD, escrowName);
     }
 
     /**
@@ -98,8 +94,8 @@ abstract contract AEscrow is Initializable, IEscrow {
             revert NoWithdrawRequest(msg.sender);
         }
 
-        if (block.timestamp < req.requestTime + LOCK_PERIOD) {
-            revert LockPeriodActive(msg.sender, (req.requestTime + LOCK_PERIOD) - block.timestamp);
+        if (block.timestamp < req.requestTime + LShared.LOCK_PERIOD) {
+            revert LockPeriodActive(msg.sender, (req.requestTime + LShared.LOCK_PERIOD) - block.timestamp);
         }
 
         uint256 amount = req.amount;

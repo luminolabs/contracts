@@ -6,7 +6,7 @@ interface IEpochManager {
     enum State {COMMIT, REVEAL, ELECT, EXECUTE, CONFIRM, DISPUTE, PAUSED}
 
     // Errors
-    error InvalidState(State state);
+    error InvalidState(State state, State currentState);
 
     // Epoch management functions
     function getCurrentEpoch() external view returns (uint256);

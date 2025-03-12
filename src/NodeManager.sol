@@ -135,7 +135,11 @@ contract NodeManager is Initializable, INodeManager {
      * @notice Calculates the required stake for a given node's compute rating
      */
     function calculateStakeForRating(uint256 computeRating) internal pure returns (uint256) {
-        return computeRating * LShared.STAKE_PER_RATING;
+        uint256 stake = computeRating * LShared.STAKE_PER_RATING;
+        if (stake == 0) {
+            stake = LShared.MIN_DEPOSIT;
+        }
+        return stake;
     }
 
     /**

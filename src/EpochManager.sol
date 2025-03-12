@@ -66,7 +66,7 @@ contract EpochManager is IEpochManager {
     function validateEpochState(State state) external view {
         (State currentState,) = getEpochState();
         if (currentState != state) {
-            revert InvalidState(state);
+            revert InvalidState(state, currentState);
         }
     }
 }
