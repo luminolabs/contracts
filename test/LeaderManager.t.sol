@@ -115,7 +115,7 @@ contract LeaderManagerTest is Test {
         vm.warp(block.timestamp + LShared.COMMIT_DURATION);
         
         vm.startPrank(cp1);
-        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8)", uint8(IEpochManager.State.COMMIT)));
+        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8,uint8)", uint8(IEpochManager.State.COMMIT), uint8(IEpochManager.State.REVEAL)));
         leaderManager.submitCommitment(nodeId, commitment);
         vm.stopPrank();
     }

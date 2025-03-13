@@ -9,12 +9,12 @@ contract EpochManagerTest is Test {
     EpochManager public epochManager;
     
     // Constants from LShared for easier reference
-    uint256 constant COMMIT_DURATION = 15 seconds;
-    uint256 constant REVEAL_DURATION = 15 seconds;
-    uint256 constant ELECT_DURATION = 15 seconds;
-    uint256 constant EXECUTE_DURATION = 15 seconds;
-    uint256 constant CONFIRM_DURATION = 45 seconds;
-    uint256 constant DISPUTE_DURATION = 15 seconds;
+    uint256 constant COMMIT_DURATION = 30 seconds;
+    uint256 constant REVEAL_DURATION = 30 seconds;
+    uint256 constant ELECT_DURATION = 30 seconds;
+    uint256 constant EXECUTE_DURATION = 30 seconds;
+    uint256 constant CONFIRM_DURATION = 30 seconds;
+    uint256 constant DISPUTE_DURATION = 30 seconds;
     uint256 constant EPOCH_DURATION = COMMIT_DURATION + REVEAL_DURATION + ELECT_DURATION + 
                                     EXECUTE_DURATION + CONFIRM_DURATION + DISPUTE_DURATION;
 
@@ -161,11 +161,11 @@ contract EpochManagerTest is Test {
         vm.warp(0); // Start at COMMIT state
         
         // Try to validate REVEAL state during COMMIT
-        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8)", uint8(IEpochManager.State.REVEAL)));
+        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8,uint8)", uint8(IEpochManager.State.REVEAL), uint8(IEpochManager.State.COMMIT)));
         epochManager.validateEpochState(IEpochManager.State.REVEAL);
         
         // Try to validate ELECT state during COMMIT
-        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8)", uint8(IEpochManager.State.ELECT)));
+        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8,uint8)", uint8(IEpochManager.State.ELECT), uint8(IEpochManager.State.COMMIT)));
         epochManager.validateEpochState(IEpochManager.State.ELECT);
     }
 }

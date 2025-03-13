@@ -110,7 +110,6 @@ contract JobManager is Initializable, IJobManager {
         leaderManager.validateLeader(msg.sender);
 
         assignmentRoundStarted[epochManager.getCurrentEpoch()] = true;
-
         uint256[] memory newJobs = jobsByStatus[JobStatus.NEW];
         if (newJobs.length == 0) {
             return;
@@ -122,12 +121,11 @@ contract JobManager is Initializable, IJobManager {
             uint256 jobId = newJobs[i];
             Job storage job = jobs[jobId];
 
-            uint256[] memory nodesInPool = nodeManager.getNodesInPool(job.requiredPool);
-            if (nodesInPool.length == 0) continue;
-
-            uint256[] memory eligibleNodes = filterEligibleNodes(nodesInPool);
+            // Get all eligible nodes (including those from higher compute pools)
+            uint256[] memory eligibleNodes = getEligibleNodesForJob(job.requiredPool);
             if (eligibleNodes.length == 0) continue;
 
+            // Select a node using random seed
             uint256 selectedIndex = uint256(keccak256(abi.encodePacked(randomSeed, jobId))) % eligibleNodes.length;
             uint256 selectedNode = eligibleNodes[selectedIndex];
 
@@ -330,6 +328,52 @@ contract JobManager is Initializable, IJobManager {
     }
 
     // Internal functions
+
+    /**
+     * @notice Gets all eligible nodes for a job, including nodes from higher compute pools
+     * @param requiredPool Minimum compute rating required for the job
+     * @return Array of eligible node IDs
+     */
+    function getEligibleNodesForJob(uint256 requiredPool) internal view returns (uint256[] memory) {
+        uint256[] memory allPools = nodeManager.getAllComputePools();
+
+        // Count total eligible nodes
+        uint256 totalEligible = 0;
+        for (uint256 i = 0; i < allPools.length; i++) {
+            if (allPools[i] >= requiredPool) {
+                uint256[] memory poolNodes = nodeManager.getNodesInPool(allPools[i]);
+                totalEligible += filterEligibleNodes(poolNodes).length;
+            }
+        }
+
+        // Create result array
+        uint256[] memory eligibleNodes = new uint256[](totalEligible);
+        uint256 currentIndex = 0;
+
+        // Populate eligible nodes from all qualifying pools
+        for (uint256 i = 0; i < allPools.length; i++) {
+            if (allPools[i] >= requiredPool) {
+                uint256[] memory poolNodes = nodeManager.getNodesInPool(allPools[i]);
+                uint256[] memory filteredNodes = filterEligibleNodes(poolNodes);
+                for (uint256 j = 0; j < filteredNodes.length; j++) {
+                    eligibleNodes[currentIndex] = filteredNodes[j];
+                    currentIndex++;
+                }
+            }
+        }
+
+        return eligibleNodes;
+    }
+
+    /**
+     * @notice Checks if a pool value already exists in an array
+     */
+    function containsPool(uint256[] memory pools, uint256 length, uint256 value) internal pure returns (bool) {
+        for (uint256 i = 0; i < length; i++) {
+            if (pools[i] == value) return true;
+        }
+        return false;
+    }
 
     function removeJobFromNodeAssignments(uint256 jobId) internal {
         Job storage job = jobs[jobId];

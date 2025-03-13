@@ -200,7 +200,7 @@ contract EpochStateTransitionsE2ETest is Test {
         leaderManager.submitCommitment(nodeIds[0], commitment);
         
         // Try to reveal secret (should fail, wrong phase)
-        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8)", uint8(IEpochManager.State.REVEAL)));
+        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8,uint8)", uint8(IEpochManager.State.REVEAL), uint8(IEpochManager.State.COMMIT)));
         leaderManager.revealSecret(nodeIds[0], secret);
         vm.stopPrank();
         
@@ -211,7 +211,7 @@ contract EpochStateTransitionsE2ETest is Test {
         
         // 4. Attempt to perform COMMIT phase action
         vm.startPrank(cp2);
-        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8)", uint8(IEpochManager.State.COMMIT)));
+        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8,uint8)", uint8(IEpochManager.State.COMMIT), uint8(IEpochManager.State.REVEAL)));
         leaderManager.submitCommitment(nodeIds[1], keccak256(bytes("secret2")));
         vm.stopPrank();
         
@@ -226,7 +226,7 @@ contract EpochStateTransitionsE2ETest is Test {
         
         // 6. Attempt to perform EXECUTE phase action
         vm.startPrank(cp1);
-        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8)", uint8(IEpochManager.State.EXECUTE)));
+        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8,uint8)", uint8(IEpochManager.State.EXECUTE), uint8(IEpochManager.State.ELECT)));
         jobManager.startAssignmentRound();
         vm.stopPrank();
     }
@@ -257,7 +257,7 @@ contract EpochStateTransitionsE2ETest is Test {
         
         // 4. Validate cp2 cannot participate late
         vm.startPrank(cp2);
-        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8)", uint8(IEpochManager.State.COMMIT)));
+        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8,uint8)", uint8(IEpochManager.State.COMMIT), uint8(IEpochManager.State.ELECT)));
         leaderManager.submitCommitment(nodeIds[1], keccak256(bytes("secret2")));
         vm.stopPrank();
     }
@@ -274,7 +274,7 @@ contract EpochStateTransitionsE2ETest is Test {
         
         // 3. Try to use epoch 1 leader permissions in epoch 2
         vm.startPrank(leader1);
-        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8)", uint8(IEpochManager.State.EXECUTE)));
+        vm.expectRevert(abi.encodeWithSignature("InvalidState(uint8,uint8)", uint8(IEpochManager.State.EXECUTE), uint8(IEpochManager.State.COMMIT)));
         jobManager.startAssignmentRound();
         vm.stopPrank();
         

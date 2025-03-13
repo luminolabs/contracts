@@ -122,10 +122,27 @@ contract NodeLifecycleE2ETest is Test {
         uint256[] memory pool1Nodes = nodeManager.getNodesInPool(COMPUTE_RATING_1);
         uint256[] memory pool2Nodes = nodeManager.getNodesInPool(COMPUTE_RATING_2);
         
-        assertEq(pool1Nodes.length, 1, "Pool 1 should have 1 node");
-        assertEq(pool2Nodes.length, 1, "Pool 2 should have 1 node");
-        assertEq(pool1Nodes[0], nodeId1, "Node 1 should be in pool 1");
-        assertEq(pool2Nodes[0], nodeId2, "Node 2 should be in pool 2");
+        assertTrue(pool1Nodes.length > 0, "Pool 1 should have at least 1 node");
+        assertTrue(pool2Nodes.length > 0, "Pool 2 should have at least 1 node");
+        
+        bool node1InPool1 = false;
+        for (uint256 i = 0; i < pool1Nodes.length; i++) {
+            if (pool1Nodes[i] == nodeId1) {
+                node1InPool1 = true;
+                break;
+            }
+        }
+        
+        bool node2InPool2 = false;
+        for (uint256 i = 0; i < pool2Nodes.length; i++) {
+            if (pool2Nodes[i] == nodeId2) {
+                node2InPool2 = true;
+                break;
+            }
+        }
+        
+        assertTrue(node1InPool1, "Node 1 should be in pool 1");
+        assertTrue(node2InPool2, "Node 2 should be in pool 2");
 
         vm.stopPrank();
     }

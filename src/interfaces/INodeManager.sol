@@ -30,4 +30,5 @@ interface INodeManager {
     function getNodeInfo(uint256 nodeId) external view returns (NodeInfo memory);
     function validateNodeOwner(uint256 nodeId, address sender) external view;
     function getStakeRequirement(address cp) external view returns (uint256);
+    function getAllComputePools() external view returns (uint256[] memory);
 }

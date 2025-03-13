@@ -10,20 +10,22 @@ import {LShared} from "./libraries/LShared.sol";
 
 contract NodeManager is Initializable, INodeManager {
     // Contracts
-    INodeEscrow public nodeEscrow;
-    IAccessManager private accessManager;
-    IWhitelistManager private whitelistManager;
+    INodeEscrow internal nodeEscrow;
+    IWhitelistManager internal whitelistManager;
+    IAccessManager internal accessManager;
 
     // State variables
     uint256 private nodeCounter;
-    mapping(uint256 => NodeInfo) private nodes;
-    mapping(address => uint256[]) private cpNodes;
-    mapping(uint256 => uint256[]) private poolNodes;
-    mapping(address => uint256) private cpStakeRequirements;
+    mapping(uint256 => NodeInfo) private nodes; // nodeId => NodeInfo
+    mapping(address => uint256[]) private ownerNodes; // owner => array of nodeIds
+    mapping(address => uint256) private stakeRequirements; // cp => total required stake
+    mapping(uint256 => uint256[]) private computePools; // computeRating => array of nodeIds
 
-    /**
-     * @notice Initializes the NodeManager contract
-     */
+    // New state for tracking compute pools
+    mapping(uint256 => uint256) private poolNodeCount; // computeRating => number of active nodes
+    mapping(uint256 => bool) private poolExists; // computeRating => exists flag
+    uint256[] private activeComputePools; // Array of all active compute ratings
+
     function initialize(
         address _nodeEscrow,
         address _whitelistManager,
@@ -35,121 +37,141 @@ contract NodeManager is Initializable, INodeManager {
     }
 
     /**
-     * @notice Register a new compute node
+     * @notice Registers a new node with the specified compute rating
      */
     function registerNode(uint256 computeRating) external returns (uint256) {
-        // Validate whitelist and stake
         whitelistManager.requireWhitelisted(msg.sender);
-        validateStake(msg.sender, computeRating);
 
-        // Create new node
+        uint256 requiredStake = computeRating * LShared.STAKE_PER_RATING;
+        nodeEscrow.requireBalance(msg.sender, requiredStake);
+
         nodeCounter++;
-        nodes[nodeCounter] = NodeInfo({
+        uint256 nodeId = nodeCounter;
+
+        nodes[nodeId] = NodeInfo({
             cp: msg.sender,
-            nodeId: nodeCounter,
+            nodeId: nodeId,
             computeRating: computeRating
         });
 
-        // Update mappings
-        cpNodes[msg.sender].push(nodeCounter);
-        poolNodes[computeRating].push(nodeCounter);
+        ownerNodes[msg.sender].push(nodeId);
+        computePools[computeRating].push(nodeId);
+        stakeRequirements[msg.sender] += requiredStake;
 
-        // Update stake requirements
-        uint256 newRequirement = cpStakeRequirements[msg.sender] + calculateStakeForRating(computeRating);
-        cpStakeRequirements[msg.sender] = newRequirement;
-        emit StakeRequirementUpdated(msg.sender, newRequirement);
+        // Update active compute pools
+        if (!poolExists[computeRating]) {
+            poolExists[computeRating] = true;
+            activeComputePools.push(computeRating);
+        }
+        poolNodeCount[computeRating]++;
 
-        emit NodeRegistered(msg.sender, nodeCounter, computeRating);
-        return nodeCounter;
+        emit NodeRegistered(msg.sender, nodeId, computeRating);
+        emit StakeRequirementUpdated(msg.sender, stakeRequirements[msg.sender]);
+
+        return nodeId;
     }
 
+    /**
+     * @notice Unregisters an existing node
+     */
     function unregisterNode(uint256 nodeId) external {
-        // Validate node ownership
         validateNodeOwner(nodeId, msg.sender);
 
-        // Get node info
         NodeInfo memory node = nodes[nodeId];
-
-        // Remove node from CP's list
-        uint256[] storage cpNodeList = cpNodes[msg.sender];
-        for (uint256 i = 0; i < cpNodeList.length; i++) {
-            if (cpNodeList[i] == nodeId) {
-                cpNodeList[i] = cpNodeList[cpNodeList.length - 1];
-                cpNodeList.pop();
-                break;
-            }
+        if (node.nodeId == 0) {
+            revert NodeNotFound(nodeId);
         }
 
-        // Remove node from pool's list
-        uint256[] storage poolNodeList = poolNodes[node.computeRating];
-        for (uint256 i = 0; i < poolNodeList.length; i++) {
-            if (poolNodeList[i] == nodeId) {
-                poolNodeList[i] = poolNodeList[poolNodeList.length - 1];
-                poolNodeList.pop();
-                break;
-            }
-        }
+        // Remove from ownerNodes
+        removeFromArray(ownerNodes[msg.sender], nodeId);
+
+        // Remove from computePools
+        removeFromArray(computePools[node.computeRating], nodeId);
 
         // Update stake requirements
-        uint256 newRequirement = cpStakeRequirements[msg.sender] - calculateStakeForRating(node.computeRating);
-        cpStakeRequirements[msg.sender] = newRequirement;
-        emit StakeRequirementUpdated(msg.sender, newRequirement);
+        uint256 stakeReduction = node.computeRating * LShared.STAKE_PER_RATING;
+        stakeRequirements[msg.sender] -= stakeReduction;
+
+        // Update active compute pools
+        poolNodeCount[node.computeRating]--;
+        if (poolNodeCount[node.computeRating] == 0) {
+            poolExists[node.computeRating] = false;
+            removeFromArray(activeComputePools, node.computeRating);
+        }
+
+        delete nodes[nodeId];
 
         emit NodeUnregistered(msg.sender, nodeId);
+        emit StakeRequirementUpdated(msg.sender, stakeRequirements[msg.sender]);
     }
 
     /**
-     * @notice Gets all nodes in a pool
+     * @notice Gets all nodes in a specific compute pool
      */
     function getNodesInPool(uint256 poolId) external view returns (uint256[] memory) {
-        return poolNodes[poolId];
+        return computePools[poolId];
     }
 
     /**
-     * @notice Gets the owner of a node
+     * @notice Gets all active compute pools
+     * @return Array of active compute ratings
      */
-    function getNodeOwner(uint256 nodeId) public view returns (address) {
-        return nodes[nodeId].cp;
+    function getAllComputePools() external view returns (uint256[] memory) {
+        return activeComputePools;
     }
 
     /**
-     * @notice Validates if a caller is the owner of a node
+     * @notice Gets the owner of a specific node
      */
-    function validateNodeOwner(uint256 nodeId, address caller) public view {
-        if (getNodeOwner(nodeId) != caller) {
-            revert InvalidNodeOwner(nodeId, caller);
+    function getNodeOwner(uint256 nodeId) external view returns (address) {
+        NodeInfo memory node = nodes[nodeId];
+        if (node.nodeId == 0) {
+            revert NodeNotFound(nodeId);
         }
+        return node.cp;
     }
 
-    function getStakeRequirement(address cp) external view returns (uint256) {
-        return cpStakeRequirements[cp];
-    }
-
+    /**
+     * @notice Gets detailed information about a node
+     */
     function getNodeInfo(uint256 nodeId) external view returns (NodeInfo memory) {
-        return nodes[nodeId];
-    }
-
-    // Internal functions
-
-    /**
-     * @notice Calculates the required stake for a given node's compute rating
-     */
-    function calculateStakeForRating(uint256 computeRating) internal pure returns (uint256) {
-        uint256 stake = computeRating * LShared.STAKE_PER_RATING;
-        if (stake == 0) {
-            stake = LShared.MIN_DEPOSIT;
+        NodeInfo memory node = nodes[nodeId];
+        if (node.nodeId == 0) {
+            revert NodeNotFound(nodeId);
         }
-        return stake;
+        return node;
     }
 
     /**
-     * @notice Validates if a CP has sufficient stake for a given compute rating
+     * @notice Validates that the sender owns the specified node
      */
-    function validateStake(address cp, uint256 computeRating) internal view {
-        uint256 currentRequirement = cpStakeRequirements[cp];
-        uint256 newRequirement = computeRating * LShared.STAKE_PER_RATING;
-        uint256 totalRequired = currentRequirement + newRequirement;
+    function validateNodeOwner(uint256 nodeId, address sender) public view {
+        NodeInfo memory node = nodes[nodeId];
+        if (node.nodeId == 0) {
+            revert NodeNotFound(nodeId);
+        }
+        if (node.cp != sender) {
+            revert InvalidNodeOwner(nodeId, sender);
+        }
+    }
 
-        nodeEscrow.requireBalance(cp, totalRequired);
+    /**
+     * @notice Gets the total stake requirement for a computing provider
+     */
+    function getStakeRequirement(address cp) external view returns (uint256) {
+        return stakeRequirements[cp];
+    }
+
+    /**
+     * @notice Internal helper function to remove an element from an array
+     */
+    function removeFromArray(uint256[] storage array, uint256 value) internal {
+        for (uint256 i = 0; i < array.length; i++) {
+            if (array[i] == value) {
+                array[i] = array[array.length - 1];
+                array.pop();
+                break;
+            }
+        }
     }
 }

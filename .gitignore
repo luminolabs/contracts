@@ -18,7 +18,7 @@ __pycache__/
 .vscode
 .idea
 *.iml
-testnet.txt
+contracts.txt
 repomix-output.txt
 .DS_Store
 slither-results.sarif
