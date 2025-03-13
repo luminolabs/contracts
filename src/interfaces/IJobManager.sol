@@ -15,6 +15,7 @@ interface IJobManager {
         string args;
         string baseModelName;  // TODO: Make configurable enum
         string ftType;  // TODO: Make configurable enum
+        uint256 numGpus;
         uint256 tokenCount;
         uint256 createdAt;
     }

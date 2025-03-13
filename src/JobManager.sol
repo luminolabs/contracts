@@ -57,26 +57,28 @@ contract JobManager is Initializable, IJobManager {
         jobCounter++;
         uint256 jobId = jobCounter;
         uint256 requiredPool = 0;
+        uint256 numGpus = 0;
 
         // Assign pool for job
         if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_dummy"))) {
             requiredPool = 0;
+            numGpus = 0;
         } else if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_2_1b"))) {
             requiredPool = 500;
+            numGpus = 1;
         } else if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_2_3b"))) {
             requiredPool = 500;
+            numGpus = 1;
         } else if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_1_8b"))) {
-            if (keccak256(abi.encodePacked(ftType)) == keccak256(abi.encodePacked("FULL"))) {
-                requiredPool = 1500;
-            } else {
-                requiredPool = 500;
-            }
-        } else if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_1_70b")) ||
-            keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_3_70b"))) {
+            requiredPool = 500;
+            numGpus = 1;
+        } else if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_3_70b"))) {
             if (keccak256(abi.encodePacked(ftType)) == keccak256(abi.encodePacked("FULL"))) {
                 requiredPool = 8400;
+                numGpus = 8;
             } else {
                 requiredPool = 2700;
+                numGpus = 4;
             }
         } else {
             revert InvalidModelName(baseModelName);
@@ -91,6 +93,7 @@ contract JobManager is Initializable, IJobManager {
             args: jobArgs,
             baseModelName: baseModelName,
             ftType: ftType,
+            numGpus: numGpus,
             tokenCount: 0,
             createdAt: block.timestamp
         });
