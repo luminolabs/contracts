@@ -23,6 +23,7 @@ repomix-output.txt
 .DS_Store
 slither-results.sarif
 lcov.info
+addresses.json
 
 # Docs
 docs/
