@@ -57,12 +57,12 @@ contract JobManager is Initializable, IJobManager {
         jobCounter++;
         uint256 jobId = jobCounter;
         uint256 requiredPool = 0;
-        uint256 numGpus = 0;
+        uint256 numGpus = 1;
 
         // Assign pool for job
         if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_dummy"))) {
             requiredPool = 0;
-            numGpus = 0;
+            numGpus = 1;
         } else if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_2_1b"))) {
             requiredPool = 500;
             numGpus = 1;
