@@ -24,8 +24,8 @@ contract NodeLifecycleE2ETest is Test {
 
     // Constants
     uint256 public constant INITIAL_BALANCE = 10000 ether;
-    uint256 public constant COMPUTE_RATING_1 = 500;
-    uint256 public constant COMPUTE_RATING_2 = 500;
+    uint256 public constant COMPUTE_RATING_1 = 150;
+    uint256 public constant COMPUTE_RATING_2 = 150;
     uint256 public constant STAKE_AMOUNT = 5000 ether;
     uint256 public constant LOCK_PERIOD = 1 days;
 

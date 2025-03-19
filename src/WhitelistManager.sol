@@ -15,11 +15,6 @@ contract WhitelistManager is Initializable, IWhitelistManager {
     address[] private whitelistedCPs;
     mapping(address => uint256) private cpIndex;
 
-    // Errors
-    error AlreadyWhitelisted(address cp);
-    error CooldownActive(address cp, uint256 remainingTime);
-    error NotWhitelisted(address cp);
-
     /**
      * @notice Initializes the WhitelistManager contract
      */

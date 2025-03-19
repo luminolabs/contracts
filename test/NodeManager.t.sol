@@ -220,8 +220,8 @@ contract NodeManagerTest is Test {
 
         // Register nodes with different compute ratings
         vm.startPrank(cp1);
-        uint256 rating1 = 500;
-        uint256 rating2 = 1500;
+        uint256 rating1 = 150;
+        uint256 rating2 = 1150;
         uint256 totalStake = (rating1 + rating2) * LShared.STAKE_PER_RATING;
 
         token.approve(address(nodeEscrow), totalStake);
@@ -243,7 +243,7 @@ contract NodeManagerTest is Test {
         vm.startPrank(cp1);
 
         // Register nodes
-        uint256 rating = 500;
+        uint256 rating = 150;
         uint256 stake = rating * LShared.STAKE_PER_RATING;
         token.approve(address(nodeEscrow), stake * 2);
         nodeEscrow.deposit(stake * 2);

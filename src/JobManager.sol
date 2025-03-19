@@ -64,20 +64,25 @@ contract JobManager is Initializable, IJobManager {
             requiredPool = 0;
             numGpus = 1;
         } else if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_2_1b"))) {
-            requiredPool = 500;
+            requiredPool = 150;
             numGpus = 1;
         } else if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_2_3b"))) {
-            requiredPool = 500;
+            requiredPool = 150;
             numGpus = 1;
         } else if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_1_8b"))) {
-            requiredPool = 500;
-            numGpus = 1;
+            if (keccak256(abi.encodePacked(ftType)) == keccak256(abi.encodePacked("FULL"))) {
+                requiredPool = 600;
+                numGpus = 4;
+            } else {
+                requiredPool = 150;
+                numGpus = 1;
+            }
         } else if (keccak256(abi.encodePacked(baseModelName)) == keccak256(abi.encodePacked("llm_llama3_3_70b"))) {
             if (keccak256(abi.encodePacked(ftType)) == keccak256(abi.encodePacked("FULL"))) {
-                requiredPool = 8400;
+                requiredPool = 2000;
                 numGpus = 8;
             } else {
-                requiredPool = 2700;
+                requiredPool = 640;
                 numGpus = 4;
             }
         } else {

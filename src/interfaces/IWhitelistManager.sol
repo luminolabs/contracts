@@ -6,6 +6,11 @@ interface IWhitelistManager {
     event CPAdded(address indexed cp, uint256 timestamp);
     event CPRemoved(address indexed cp, uint256 timestamp);
 
+    // Errors
+    error AlreadyWhitelisted(address cp);
+    error CooldownActive(address cp, uint256 remainingTime);
+    error NotWhitelisted(address cp);
+
     // Structs
     struct CPInfo {
         bool isWhitelisted;
