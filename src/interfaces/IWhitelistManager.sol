@@ -20,6 +20,9 @@ interface IWhitelistManager {
 
     // Whitelist management functions
     function addCP(address cp) external;
+    function addCPBatch(address[] calldata cps) external;
     function removeCP(address cp) external;
+    function removeCPBatch(address[] calldata cps) external;
     function requireWhitelisted(address cp) external view;
+    function getAllWhitelistedCPs() external view returns (address[] memory);
 }
